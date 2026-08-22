@@ -126,6 +126,34 @@ main { padding: 1rem; max-width: 1400px; margin: 0 auto; }
 }
 .espace { flex: 1 1 auto; }
 
+/* ------------------------------------------------------- Barre du jour
+   Sur grand écran : tout tient sur une ligne, comme les autres barres.
+   Sur téléphone : la date passe seule sur la première ligne et les boutons
+   « Imprimer / Excel » sur la dernière, sinon Imprimer vient se coller au
+   champ de date et Excel se retrouve orphelin en dessous. */
+.titre-jour { margin-left: .4rem; }
+.champ-date { min-width: 150px; }
+.groupe-actions { display: flex; align-items: center; gap: .5rem; }
+
+@media (max-width: 620px) {
+  .barre-jour .titre-jour {
+    order: -1;                 /* la date d'abord : elle sert de titre */
+    flex: 1 0 100%;            /* occupe toute la largeur, donc sa propre ligne */
+    margin: 0 0 .15rem;
+    font-size: 1.1rem;
+  }
+  .barre-jour .espace { display: none; }
+  .barre-jour .champ-date { flex: 1 1 auto; }
+  .barre-jour .groupe-actions { flex: 1 0 100%; }
+  .barre-jour .groupe-actions .bouton { flex: 1 1 auto; }
+
+  /* Onglet Calendrier : même principe pour la période affichée. */
+  .barre-calendrier .periode-affichee {
+    order: -1; flex: 1 0 100%; margin: 0 0 .15rem;
+  }
+  .barre-calendrier .espace { display: none; }
+}
+
 /* ----------------------------------------------------------------- Contrôles */
 input, select, textarea {
   width: 100%; padding: .55rem .7rem;

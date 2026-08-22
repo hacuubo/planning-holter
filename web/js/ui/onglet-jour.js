@@ -54,20 +54,27 @@ function barreDeNavigation() {
     onchange: (e) => { if (e.target.value) changerDate(e.target.value); },
   });
 
+  // Sur téléphone, la feuille de style fait passer la date sur sa propre ligne
+  // et renvoie le groupe « Imprimer / Excel » à la ligne suivante, pour qu'aucun
+  // bouton ne vienne se coller à la date. Voir « Barre du jour » dans styles.css.
   return el(
     'div',
-    { class: 'barre-outils' },
+    { class: 'barre-outils barre-jour' },
     el('button', { class: 'bouton', onclick: () => changerDate(jourPrecedent()) }, '←'),
     el('button', { class: 'bouton', onclick: () => changerDate(aujourdHui()) }, 'Aujourd’hui'),
     el('button', { class: 'bouton', onclick: () => changerDate(jourSuivant()) }, '→'),
-    el('strong', { style: 'margin-left:.4rem' }, dateEnFrancaisLong(dateAffichee)),
+    el('strong', { class: 'titre-jour' }, dateEnFrancaisLong(dateAffichee)),
     el('span', { class: 'espace' }),
-    el('div', { style: 'min-width:150px' }, selecteur),
-    el('button', { class: 'bouton', onclick: () => window.print() }, '🖨 Imprimer'),
-    el('button', {
-      class: 'bouton',
-      onclick: () => exporterJourneeExcel(dateAffichee),
-    }, '⬇ Excel'),
+    el('div', { class: 'champ-date' }, selecteur),
+    el(
+      'div',
+      { class: 'groupe-actions' },
+      el('button', { class: 'bouton', onclick: () => window.print() }, '🖨 Imprimer'),
+      el('button', {
+        class: 'bouton',
+        onclick: () => exporterJourneeExcel(dateAffichee),
+      }, '⬇ Excel'),
+    ),
   );
 }
 

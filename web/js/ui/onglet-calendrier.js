@@ -30,12 +30,14 @@ export function afficherCalendrier(conteneur) {
     conteneur,
     el(
       'div',
-      { class: 'barre-outils' },
+      // Même principe que la barre de l'onglet Journée : sur téléphone, la
+      // période affichée passe seule sur la première ligne (voir styles.css).
+      { class: 'barre-outils barre-calendrier' },
       el('button', { class: 'bouton', onclick: () => decaler(-30) }, '‹ Mois précédent'),
       el('button', { class: 'bouton', onclick: () => allerAujourdHui() }, 'Aujourd’hui'),
       el('button', { class: 'bouton', onclick: () => decaler(30) }, 'Mois suivant ›'),
       el('span', { class: 'espace' }),
-      el('span', { class: 'aide' },
+      el('span', { class: 'aide periode-affichee' },
         `du ${dateEnFrancais(debutFenetre)} au ${dateEnFrancais(ajouterJours(debutFenetre, largeur - 1))}`),
       el('div', { style: 'min-width:140px' }, el('input', {
         type: 'date', value: debutFenetre,
