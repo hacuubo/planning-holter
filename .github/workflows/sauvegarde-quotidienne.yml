@@ -8,6 +8,11 @@
 #  lendemain, les dépose dans l'espace de stockage Supabase, supprime les
 #  sauvegardes de plus de 7 jours et envoie le tout par e-mail.
 #
+#  Tant que Supabase n'est pas installé, la tâche s'arrête d'elle-même dès la
+#  première étape, sans erreur et sans e-mail d'alerte : il n'y a donc rien à
+#  désactiver. Elle se met en marche toute seule le jour où vous enregistrez
+#  les identifiants.
+#
 #  Les identifiants sont rangés dans : Settings ▸ Secrets and variables ▸ Actions
 #  (voir docs/03-SAUVEGARDES.md).
 # =============================================================================
@@ -35,18 +40,38 @@ jobs:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
+      # Garde-fou : avant la mise en service, aucun identifiant Supabase n'est
+      # encore enregistré. Plutôt que d'échouer tous les matins et de vous
+      # envoyer un e-mail d'erreur, la tâche s'interrompt proprement ici.
+      - name: Vérifier que Supabase est configuré
+        id: configuration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "pret=non" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Sauvegarde ignorée::Supabase n'est pas encore configuré (secrets SUPABASE_URL et SUPABASE_SERVICE_KEY absents). Voir docs/03-SAUVEGARDES.md. Rien d'anormal avant la mise en service."
+          else
+            echo "pret=oui" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Installer Node.js
+        if: steps.configuration.outputs.pret == 'oui'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Installer l'outil d'envoi d'e-mail
+        if: steps.configuration.outputs.pret == 'oui'
         run: npm install --no-save --no-audit --no-fund nodemailer@6
 
       - name: Vérifier les règles métier avant de sauvegarder
+        if: steps.configuration.outputs.pret == 'oui'
         run: node --test "tests/*.test.mjs"
 
       - name: Produire et envoyer la sauvegarde
+        if: steps.configuration.outputs.pret == 'oui'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -59,7 +84,7 @@ jobs:
         run: node scripts/sauvegarde-quotidienne.mjs
 
       # Les fichiers ne sont JAMAIS enregistrés dans le dépôt GitHub :
-      # ils contiennent des données de patients et le dépôt est public.
+      # ils contiennent des données de patients.
       - name: Effacer les fichiers produits
         if: always()
         run: rm -rf sauvegardes
