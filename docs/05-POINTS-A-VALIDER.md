@@ -86,6 +86,57 @@ Il reste une seule chose à faire côté technique : indiquer **le serveur d'env
 
 ---
 
+## ✅ Réglé — Les deux phases : mise au point, puis mise en service
+
+Le cabinet a choisi de séparer nettement deux périodes. C'est une bonne décision :
+tant qu'il n'y a pas de vrai patient dans la base, il n'y a rien à protéger, et on
+peut modifier le logiciel aussi souvent qu'on veut.
+
+### Phase 1 — aujourd'hui : mise au point (dépôt **public**, GitHub Pages)
+
+| | |
+|---|---|
+| Le code | https://github.com/hacuubo/planning-holter |
+| Le site | https://hacuubo.github.io/planning-holter/ |
+| La démonstration | https://hacuubo.github.io/planning-holter/web/demonstration.html |
+
+Le dépôt est public **parce que GitHub Pages n'est gratuit qu'à cette
+condition**. Aucun inconvénient à ce stade : le dépôt ne contient que du code et
+de la documentation — ni identifiants, ni clés, ni patients. Et GitHub Pages
+accepte autant de mises à jour que l'on veut : c'est exactement ce qu'il faut
+pour ajuster le logiciel au fil de l'eau.
+
+### Phase 2 — le jour de la mise en service (dépôt **privé**, Netlify)
+
+Quand de vrais noms de patients entreront dans la base :
+
+1. le dépôt GitHub repasse en **privé** (Settings ▸ General ▸ Danger Zone ▸
+   *Change repository visibility*) ;
+2. le site est publié par **Netlify**, qui accepte gratuitement les dépôts privés
+   — contrairement à GitHub Pages, qui demanderait un abonnement ;
+3. GitHub Pages est désactivé, et l'adresse donnée aux secrétaires devient celle
+   de Netlify.
+
+Deux points à connaître pour ce jour-là :
+
+- **Netlify limite le nombre de mises en ligne** (environ 20 par mois sur l'offre
+  gratuite). Il faudra donc regrouper les modifications au lieu de publier à
+  chaque petit changement. Ce n'est pas gênant une fois le logiciel stabilisé.
+- **Repasser en privé ne réécrit pas le passé** : ce qui a été public a pu être
+  copié. C'est sans conséquence ici, puisque rien de confidentiel n'y a jamais
+  figuré — mais c'est la raison pour laquelle il ne faut jamais, à aucun moment,
+  mettre une clé ou un fichier de sauvegarde dans le dépôt.
+
+- **La sauvegarde quotidienne ne bouge pas** : elle tourne sur GitHub Actions, qui
+  fonctionne aussi bien en dépôt privé qu'en dépôt public.
+
+> **Attention à ne pas confondre.** Netlify héberge le *site* — des fichiers
+> HTML et JavaScript, sans aucune donnée. Les données de patients, elles, sont
+> chez **Supabase**. Passer à Netlify ne change donc rien à la question de
+> l'hébergement de santé traitée ci-dessous.
+
+---
+
 ## ⚠️ Décision à prendre — L'hébergement
 
 **Le fait** — même réduit au nom et au sexe, votre planning associe une personne

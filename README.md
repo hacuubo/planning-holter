@@ -29,12 +29,16 @@ patients sur des périodes qui se chevauchent.
 
 ## Essayer sans rien installer
 
+**→ https://hacuubo.github.io/planning-holter/web/demonstration.html**
+
 Une version de démonstration, remplie de patients fictifs, permet de tout
-essayer sans risque et sans compte à créer : ouvrez `web/demonstration.html`
-après avoir lancé le petit serveur local (voir
-[docs/01-INSTALLATION.md](docs/01-INSTALLATION.md), annexe « Essayer en local »).
+essayer sans risque, sans compte à créer et sans rien installer. Elle
+fonctionne aussi bien sur ordinateur que sur téléphone.
 
 Rien n'y est enregistré : en rechargeant la page, tout repart à zéro.
+
+Pour la faire tourner sur votre propre ordinateur plutôt qu'en ligne, voir
+[docs/01-INSTALLATION.md](docs/01-INSTALLATION.md), annexe « Essayer en local ».
 
 ---
 

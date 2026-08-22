@@ -113,34 +113,30 @@ Enregistrez le fichier. **Ne touchez à rien d'autre.**
 
 ---
 
-## Étape 4 — Publier le site sur GitHub Pages
+## Étape 4 — Le site est déjà publié
 
-1. Créez un compte sur **https://github.com** si vous n'en avez pas.
-2. Cliquez sur **+** (en haut à droite) ▸ **New repository**.
-   - **Repository name** : `planning-holter`
-   - **Public** (nécessaire pour que GitHub Pages soit gratuit ; le code y est
-     visible, mais **aucune donnée de patient** n'y figure jamais)
-   - Ne cochez rien d'autre. Cliquez sur **Create repository**.
-3. Sur la page qui s'affiche, cliquez sur **uploading an existing file**.
-4. Dans l'explorateur Windows, ouvrez le dossier du projet, **sélectionnez tout**
-   (`Ctrl+A`) et **glissez-déposez** dans la fenêtre GitHub.
-   Attendez la fin du transfert, puis cliquez sur **Commit changes**.
-5. Allez dans **Settings** (onglet du dépôt) ▸ **Pages** (menu de gauche).
-   - **Source** : *Deploy from a branch*
-   - **Branch** : `main` et dossier **`/ (root)`**
-   - Cliquez sur **Save**.
-6. Patientez 1 à 2 minutes, puis rechargez la page : GitHub affiche l'adresse de
-   votre site.
+**Cette étape est faite.** Le dépôt et le site existent depuis le 22 août 2026 :
 
-**C'est l'adresse à donner aux secrétaires**, par exemple :
+| | |
+|---|---|
+| **Le code** | https://github.com/hacuubo/planning-holter |
+| **Le site** | https://hacuubo.github.io/planning-holter/ |
+| **La démonstration** | https://hacuubo.github.io/planning-holter/web/demonstration.html |
 
-```
-https://votre-compte.github.io/planning-holter/
-```
+L'adresse du site est **celle à donner aux secrétaires**. Demandez-leur de
+l'ajouter en favori, et sur téléphone d'utiliser « Ajouter à l'écran d'accueil » :
+l'application s'ouvrira comme une vraie application.
 
-Demandez-leur de l'ajouter en favori, et sur téléphone d'utiliser
-« Ajouter à l'écran d'accueil » : l'application s'ouvrira comme une vraie
-application.
+Tant que l'étape 3 n'est pas faite, le site affiche un message expliquant que la
+configuration est incomplète — c'est normal. La **démonstration**, elle,
+fonctionne dès maintenant : elle n'a besoin d'aucune base de données.
+
+> **Pourquoi le dépôt est public en ce moment.** GitHub Pages n'héberge
+> gratuitement que les dépôts publics. Cela ne pose aucun problème : le dépôt ne
+> contient que du code, jamais de données de patients ni de clés d'accès. Le
+> passage en dépôt privé, avec l'hébergement du site chez Netlify, est prévu pour
+> la mise en service réelle — voir
+> [05-POINTS-A-VALIDER.md](05-POINTS-A-VALIDER.md), section « Les deux phases ».
 
 ---
 
