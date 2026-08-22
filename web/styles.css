@@ -1,0 +1,368 @@
+/* ==========================================================================
+   Planning Holter — feuille de style unique
+   Objectif : interface claire, épurée, lisible sur ordinateur comme sur
+   téléphone. Les couleurs de matériel sont définies une seule fois ici et
+   dans js/core/materiel.js.
+   ========================================================================== */
+
+:root {
+  --fond: #f1f5f9;
+  --surface: #ffffff;
+  --bord: #e2e8f0;
+  --bord-fort: #cbd5e1;
+  --texte: #0f172a;
+  --texte-doux: #64748b;
+  --primaire: #0f766e;
+  --primaire-fonce: #115e59;
+  --primaire-clair: #ccfbf1;
+  --danger: #b91c1c;
+  --danger-clair: #fee2e2;
+  --alerte: #b45309;
+  --alerte-clair: #fef3c7;
+  --succes: #15803d;
+  --succes-clair: #dcfce7;
+
+  --holter-dms: #1e3a8a;
+  --holter-dms-fond: #dbeafe;
+  --holter-ela: #1d4ed8;
+  --holter-ela-fond: #e0f2fe;
+  --mapa: #6d28d9;
+  --mapa-fond: #ede9fe;
+  --polygraphie: #0f766e;
+  --polygraphie-fond: #ccfbf1;
+  --spider: #c2410c;
+  --spider-fond: #ffedd5;
+
+  --rayon: 10px;
+  --ombre: 0 1px 2px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .05);
+  --entete-hauteur: 52px;
+  --onglets-hauteur: 50px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--fond);
+  color: var(--texte);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+[hidden] { display: none !important; }
+
+h1, h2, h3 { margin: 0 0 .5rem; line-height: 1.25; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; color: var(--texte-doux); font-weight: 600; }
+p { margin: 0 0 .75rem; }
+code { background: var(--bord); padding: .1em .35em; border-radius: 4px; font-size: .9em; }
+
+/* ---------------------------------------------------------------- Connexion */
+.ecran-connexion {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center; padding: 1.5rem;
+  background: linear-gradient(160deg, #0f766e 0%, #0f172a 100%);
+}
+.carte-connexion {
+  width: 100%; max-width: 380px;
+  background: var(--surface); border-radius: 16px; padding: 1.75rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .3);
+}
+.carte-connexion h1 { font-size: 1.35rem; }
+.carte-connexion .sous-titre { color: var(--texte-doux); font-size: .9rem; margin-bottom: 1.25rem; }
+.carte-connexion label { display: block; font-size: .85rem; font-weight: 600; margin: .9rem 0 .3rem; }
+
+/* ---------------------------------------------------------------- Structure */
+.entete {
+  position: sticky; top: 0; z-index: 20;
+  height: var(--entete-hauteur);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; padding: 0 .9rem;
+  background: var(--surface); border-bottom: 1px solid var(--bord);
+}
+.entete-gauche { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.entete-gauche strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logo { font-size: 1.25rem; }
+.entete-droite { display: flex; align-items: center; gap: .6rem; }
+.nom-utilisateur { color: var(--texte-doux); font-size: .85rem; }
+.pastille-etat { color: var(--succes); font-size: .7rem; }
+.pastille-etat.hors-ligne { color: var(--danger); }
+
+.onglets {
+  position: sticky; top: var(--entete-hauteur); z-index: 19;
+  display: flex; gap: .15rem; padding: 0 .5rem;
+  background: var(--surface); border-bottom: 1px solid var(--bord);
+  overflow-x: auto; scrollbar-width: none;
+}
+.onglets::-webkit-scrollbar { display: none; }
+.onglet {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: .4rem;
+  height: var(--onglets-hauteur); padding: 0 .9rem;
+  background: none; border: none; border-bottom: 3px solid transparent;
+  color: var(--texte-doux); font: inherit; font-weight: 600; font-size: .9rem;
+  cursor: pointer; white-space: nowrap;
+}
+.onglet:hover { color: var(--texte); }
+.onglet.actif { color: var(--primaire); border-bottom-color: var(--primaire); }
+.onglet span { font-size: 1rem; }
+
+main { padding: 1rem; max-width: 1400px; margin: 0 auto; }
+.vue { display: none; }
+.vue.active { display: block; }
+
+/* ------------------------------------------------------------------- Cartes */
+.carte {
+  background: var(--surface); border: 1px solid var(--bord);
+  border-radius: var(--rayon); padding: 1rem; margin-bottom: 1rem;
+  box-shadow: var(--ombre);
+}
+.carte > h2 { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+
+.barre-outils {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.espace { flex: 1 1 auto; }
+
+/* ----------------------------------------------------------------- Contrôles */
+input, select, textarea {
+  width: 100%; padding: .55rem .7rem;
+  border: 1px solid var(--bord-fort); border-radius: 8px;
+  background: var(--surface); color: var(--texte);
+  font: inherit; font-size: 16px; /* 16px évite le zoom automatique sur iPhone */
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--primaire); outline-offset: 1px; border-color: var(--primaire);
+}
+input[type="checkbox"], input[type="radio"] { width: auto; }
+label.champ { display: block; margin-bottom: .8rem; }
+label.champ > span { display: block; font-size: .85rem; font-weight: 600; margin-bottom: .3rem; }
+label.champ .facultatif { color: var(--texte-doux); font-weight: 400; }
+
+.grille { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+/* Choix Femme / Homme : deux boutons côte à côte, plus rapides qu'une liste */
+.choix-sexe { display: flex; gap: .4rem; }
+.choix-sexe .bouton { flex: 1 1 0; }
+.grille-2 { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+.bouton {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .55rem .9rem; border-radius: 8px;
+  border: 1px solid var(--bord-fort); background: var(--surface); color: var(--texte);
+  font: inherit; font-weight: 600; font-size: .9rem; cursor: pointer;
+  white-space: nowrap;
+}
+.bouton:hover { background: var(--fond); }
+.bouton:disabled { opacity: .5; cursor: not-allowed; }
+.bouton.principal { background: var(--primaire); border-color: var(--primaire); color: #fff; }
+.bouton.principal:hover { background: var(--primaire-fonce); }
+.bouton.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.bouton.danger:hover { filter: brightness(.92); }
+.bouton.discret { border-color: transparent; color: var(--texte-doux); }
+.bouton.discret:hover { background: var(--fond); color: var(--texte); }
+.bouton.large { width: 100%; margin-top: 1.1rem; padding: .7rem; }
+.bouton.petit { padding: .3rem .55rem; font-size: .82rem; }
+
+/* -------------------------------------------------------------- Étiquettes */
+.etiquette {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .18rem .5rem; border-radius: 999px;
+  font-size: .78rem; font-weight: 700; white-space: nowrap;
+}
+.etiquette.holter_ecg-DMS { background: var(--holter-dms-fond); color: var(--holter-dms); }
+.etiquette.holter_ecg-ELA { background: var(--holter-ela-fond); color: var(--holter-ela); }
+.etiquette.mapa          { background: var(--mapa-fond); color: var(--mapa); }
+.etiquette.polygraphie   { background: var(--polygraphie-fond); color: var(--polygraphie); }
+.etiquette.spider        { background: var(--spider-fond); color: var(--spider); }
+.etiquette.autre         { background: var(--bord); color: var(--texte-doux); }
+.etiquette.neutre        { background: var(--bord); color: var(--texte-doux); }
+.etiquette.urgence       { background: var(--danger-clair); color: var(--danger); }
+/* Certaines étiquettes sont cliquables : ce sont alors de vrais boutons,
+   accessibles au clavier et aux lecteurs d'écran. */
+button.etiquette { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
+button.etiquette:hover { filter: brightness(.94); }
+button.etiquette:focus-visible { outline: 2px solid var(--primaire); outline-offset: 1px; }
+
+.legende { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .8rem; }
+
+/* ------------------------------------------------------- Planning du jour */
+.creneau {
+  display: grid; grid-template-columns: 68px 1fr; gap: .6rem;
+  padding: .35rem 0; border-top: 1px solid var(--bord);
+}
+.creneau.vide { opacity: .45; }
+.creneau-heure {
+  font-variant-numeric: tabular-nums; font-weight: 700; color: var(--texte-doux);
+  padding-top: .45rem; font-size: .95rem;
+}
+.creneau.plein .creneau-heure { color: var(--texte); }
+.creneau-actes { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.creneau-libre { color: var(--texte-doux); font-size: .85rem; padding: .45rem 0; }
+
+.acte {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .5rem .65rem; border-radius: 8px;
+  border-left: 4px solid var(--bord-fort); background: var(--fond);
+}
+.acte.pose-holter_ecg-DMS { border-left-color: var(--holter-dms); background: var(--holter-dms-fond); }
+.acte.pose-holter_ecg-ELA { border-left-color: var(--holter-ela); background: var(--holter-ela-fond); }
+.acte.pose-mapa           { border-left-color: var(--mapa); background: var(--mapa-fond); }
+.acte.pose-polygraphie    { border-left-color: var(--polygraphie); background: var(--polygraphie-fond); }
+.acte.pose-spider         { border-left-color: var(--spider); background: var(--spider-fond); }
+.acte.depose { background: var(--surface); border: 1px solid var(--bord); border-left: 4px dashed var(--bord-fort); }
+.acte.termine { opacity: .55; }
+.acte-patient { font-weight: 700; }
+.acte-detail { color: var(--texte-doux); font-size: .85rem; }
+.acte-actions { margin-left: auto; display: flex; gap: .35rem; }
+
+/* --------------------------------------------------------- Disponibilités */
+.dispos { display: flex; gap: .5rem; flex-wrap: wrap; }
+.dispo {
+  border: 1px solid var(--bord); border-radius: 8px; padding: .5rem .7rem;
+  min-width: 116px; background: var(--surface);
+}
+.dispo-titre { font-size: .78rem; font-weight: 700; color: var(--texte-doux); }
+.dispo-nombre { font-size: 1.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.dispo.epuise { border-color: var(--danger); background: var(--danger-clair); }
+.dispo.epuise .dispo-nombre, .dispo.epuise .dispo-titre { color: var(--danger); }
+.dispo.tendu { border-color: var(--alerte); background: var(--alerte-clair); }
+.dispo.tendu .dispo-nombre { color: var(--alerte); }
+
+/* -------------------------------------------------------------- Messages */
+.encart { padding: .7rem .85rem; border-radius: 8px; margin-bottom: .8rem; font-size: .9rem; }
+.encart.info    { background: var(--primaire-clair); color: var(--primaire-fonce); }
+.encart.alerte  { background: var(--alerte-clair); color: var(--alerte); }
+.encart.erreur  { background: var(--danger-clair); color: var(--danger); }
+.encart.succes  { background: var(--succes-clair); color: var(--succes); }
+.encart ul { margin: .35rem 0 0; padding-left: 1.2rem; }
+
+.bandeau-alerte {
+  padding: .6rem 1rem; background: var(--danger); color: #fff;
+  font-weight: 600; font-size: .9rem; text-align: center;
+}
+
+/* Rappel des réglages encore à compléter (adresse e-mail de la sauvegarde…).
+   C'est un bouton : un clic amène directement au bon endroit. */
+.bandeau-rappel {
+  display: block; width: 100%; border: none; border-bottom: 1px solid #fcd34d;
+  padding: .55rem 1rem; background: var(--alerte-clair); color: var(--alerte);
+  font: inherit; font-weight: 600; font-size: .88rem; text-align: center;
+  cursor: pointer;
+}
+.bandeau-rappel:hover { filter: brightness(.97); }
+.bandeau-rappel:focus-visible { outline: 2px solid var(--alerte); outline-offset: -2px; }
+
+.message-erreur { color: var(--danger); font-size: .88rem; margin-top: .8rem; }
+.aide { color: var(--texte-doux); font-size: .82rem; margin-top: 1rem; }
+.vide-message { color: var(--texte-doux); text-align: center; padding: 2rem 1rem; }
+
+.notifications {
+  position: fixed; z-index: 60; left: 50%; bottom: 1.2rem; transform: translateX(-50%);
+  display: flex; flex-direction: column; gap: .5rem; align-items: center;
+  pointer-events: none; width: min(92vw, 460px);
+}
+.notification {
+  width: 100%; padding: .7rem .9rem; border-radius: 10px;
+  background: var(--texte); color: #fff; font-size: .9rem; font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+}
+.notification.erreur { background: var(--danger); }
+.notification.succes { background: var(--succes); }
+
+/* --------------------------------------------------------------- Fenêtres */
+.fond-fenetre {
+  position: fixed; inset: 0; z-index: 55;
+  display: grid; place-items: center; padding: 1rem;
+  background: rgba(15, 23, 42, .55);
+}
+.fenetre {
+  width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto;
+  background: var(--surface); border-radius: 14px; padding: 1.25rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, .35);
+}
+.fenetre-actions { display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1.1rem; flex-wrap: wrap; }
+
+/* --------------------------------------------------------------- Tableaux */
+.tableau-defilant { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { padding: .45rem .6rem; text-align: left; border-bottom: 1px solid var(--bord); }
+th { font-size: .8rem; color: var(--texte-doux); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+tbody tr:hover { background: var(--fond); }
+td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------ Calendrier annuel */
+.calendrier { overflow: auto; max-height: 74vh; border: 1px solid var(--bord); border-radius: var(--rayon); background: var(--surface); }
+.calendrier table { font-size: .78rem; border-collapse: separate; border-spacing: 0; }
+.calendrier th, .calendrier td { border-bottom: 1px solid var(--bord); border-right: 1px solid var(--bord); padding: 0; }
+.calendrier thead th {
+  position: sticky; top: 0; z-index: 3; background: var(--surface);
+  min-width: 30px; height: 46px; text-align: center; font-size: .7rem;
+  text-transform: none; letter-spacing: 0;
+}
+.calendrier thead th.mois { text-align: left; padding-left: .5rem; font-weight: 800; color: var(--texte); }
+.calendrier th.appareil {
+  position: sticky; left: 0; z-index: 2; background: var(--surface);
+  min-width: 132px; max-width: 132px; padding: 0 .5rem; height: 26px;
+  text-transform: none; letter-spacing: 0; font-size: .78rem; color: var(--texte);
+  border-right: 2px solid var(--bord-fort);
+}
+.calendrier thead th.coin { position: sticky; left: 0; z-index: 4; border-right: 2px solid var(--bord-fort); }
+.calendrier td.jour { height: 26px; position: relative; }
+.calendrier td.week-end { background: var(--fond); }
+.calendrier td.ferie { background: var(--alerte-clair); }
+.calendrier td.aujourdhui { box-shadow: inset 0 0 0 2px var(--primaire); }
+.calendrier .trait {
+  position: absolute; inset: 4px 0; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: .62rem; font-weight: 700; overflow: hidden;
+  cursor: pointer;
+}
+.calendrier .trait.debut { left: 3px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.calendrier .trait.fin { right: 3px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.calendrier .trait.holter_ecg-DMS { background: var(--holter-dms); }
+.calendrier .trait.holter_ecg-ELA { background: var(--holter-ela); }
+.calendrier .trait.mapa { background: var(--mapa); }
+.calendrier .trait.polygraphie { background: var(--polygraphie); }
+.calendrier .trait.spider { background: var(--spider); }
+.calendrier .trait.autre { background: var(--texte-doux); }
+
+/* --------------------------------------------------------- Propositions */
+.propositions { display: grid; gap: .5rem; }
+.proposition {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  border: 1px solid var(--bord); border-radius: 8px; padding: .65rem .8rem;
+  background: var(--surface);
+}
+.proposition:hover { border-color: var(--primaire); }
+.proposition-date { font-weight: 700; }
+.proposition-detail { color: var(--texte-doux); font-size: .85rem; }
+.proposition .bouton { margin-left: auto; }
+
+.recap { border: 1px solid var(--bord); border-radius: 8px; padding: .75rem; background: var(--fond); }
+.recap-ligne { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .35rem 0; }
+.recap-ligne + .recap-ligne { border-top: 1px dashed var(--bord-fort); }
+
+/* ------------------------------------------------------------- Téléphone */
+@media (max-width: 640px) {
+  main { padding: .7rem; }
+  .carte { padding: .8rem; }
+  .onglet { padding: 0 .7rem; font-size: .82rem; }
+  .onglet span { font-size: 1.05rem; }
+  .entete-droite .nom-utilisateur { display: none; }
+  .creneau { grid-template-columns: 54px 1fr; }
+  .acte { padding: .55rem; }
+  .acte-actions { margin-left: 0; width: 100%; }
+}
+
+/* -------------------------------------------------------------- Impression */
+@media print {
+  .entete, .onglets, .barre-outils, .bouton, .notifications, .bandeau-alerte { display: none !important; }
+  body { background: #fff; }
+  main { padding: 0; max-width: none; }
+  .carte { border: none; box-shadow: none; padding: 0; }
+  .creneau { break-inside: avoid; }
+  .acte { border: 1px solid #999 !important; background: #fff !important; }
+}

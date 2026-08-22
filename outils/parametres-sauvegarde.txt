@@ -1,0 +1,25 @@
+# =============================================================================
+#  Paramètres de la copie locale des sauvegardes
+# =============================================================================
+#  Complétez les trois lignes ci-dessous, puis enregistrez ce fichier.
+#  Les lignes commençant par # sont des commentaires : ne les modifiez pas.
+#
+#  ⚠️ Ce fichier contient une clé qui donne accès aux données du cabinet.
+#     Rangez-le sur l'ordinateur du secrétariat, jamais dans un e-mail,
+#     jamais sur GitHub.
+# =============================================================================
+
+# Adresse du projet Supabase (Project Settings ▸ Data API ▸ Project URL)
+ADRESSE_SUPABASE=https://VOTRE-PROJET.supabase.co
+
+# Clé « service_role » (Project Settings ▸ API keys ▸ service_role, cliquer sur « Reveal »)
+CLE_SERVICE=COLLEZ-ICI-LA-CLE-SERVICE-ROLE
+
+# Dossier du cabinet où déposer les sauvegardes.
+# Exemples :
+#   C:\Users\secretariat\OneDrive\Sauvegardes Holter
+#   \\SERVEUR\Partage\Sauvegardes Holter
+DOSSIER_DESTINATION=C:\Sauvegardes Holter
+
+# Nombre de jours de sauvegardes conservés localement (7 par défaut)
+JOURS_CONSERVATION=7

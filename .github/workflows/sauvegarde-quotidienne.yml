@@ -1,0 +1,65 @@
+# =============================================================================
+#  Sauvegarde quotidienne du planning Holter
+# =============================================================================
+#  Cette tâche s'exécute automatiquement tous les matins, gratuitement, sur les
+#  serveurs de GitHub. Elle n'a besoin d'aucun ordinateur allumé au cabinet.
+#
+#  Elle produit le classeur Excel de sauvegarde et le PDF des rendez-vous du
+#  lendemain, les dépose dans l'espace de stockage Supabase, supprime les
+#  sauvegardes de plus de 7 jours et envoie le tout par e-mail.
+#
+#  Les identifiants sont rangés dans : Settings ▸ Secrets and variables ▸ Actions
+#  (voir docs/03-SAUVEGARDES.md).
+# =============================================================================
+
+name: Sauvegarde quotidienne
+
+on:
+  schedule:
+    # 05:15 UTC = 07:15 en heure d'été française, 06:15 en heure d'hiver.
+    # Le planning du lendemain est donc prêt avant l'ouverture du cabinet.
+    - cron: '15 5 * * *'
+  workflow_dispatch:        # permet aussi de la lancer à la main
+
+permissions:
+  contents: read
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: Europe/Paris        # indispensable : le logiciel raisonne en heure du cabinet
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installer l'outil d'envoi d'e-mail
+        run: npm install --no-save --no-audit --no-fund nodemailer@6
+
+      - name: Vérifier les règles métier avant de sauvegarder
+        run: node --test "tests/*.test.mjs"
+
+      - name: Produire et envoyer la sauvegarde
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+        run: node scripts/sauvegarde-quotidienne.mjs
+
+      # Les fichiers ne sont JAMAIS enregistrés dans le dépôt GitHub :
+      # ils contiennent des données de patients et le dépôt est public.
+      - name: Effacer les fichiers produits
+        if: always()
+        run: rm -rf sauvegardes

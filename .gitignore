@@ -1,0 +1,17 @@
+# ⚠️ RIEN DE CE QUI CONTIENT DES DONNÉES DE PATIENTS NE DOIT PARTIR SUR GITHUB.
+
+# Sauvegardes produites par le script quotidien
+sauvegardes/
+*.xlsx
+*.pdf
+
+# Paramètres locaux contenant des clés d'accès
+outils/parametres-sauvegarde-local.txt
+.env
+.env.*
+
+# Dépendances et fichiers temporaires
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

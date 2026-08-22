@@ -1,0 +1,90 @@
+<!doctype html>
+<!-- ⚠️ FICHIER PRODUIT AUTOMATIQUEMENT — NE PAS MODIFIER À LA MAIN.
+     Il est régénéré depuis index.html par « npm run demo ». -->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Planning Holter — démonstration</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫀</text></svg>">
+</head>
+<body>
+
+<div style="background:#b45309;color:#fff;padding:.5rem 1rem;text-align:center;font-weight:700;font-size:.85rem">Mode DÉMONSTRATION — données fictives, rien n’est enregistré</div>
+
+<!-- ========================= Écran de connexion ========================= -->
+<div id="ecran-connexion" class="ecran-connexion" hidden>
+  <form class="carte-connexion" id="formulaire-connexion">
+    <h1>🫀 Planning Holter</h1>
+    <p class="sous-titre">Pose et dépose des Holter ECG, MAPA, polygraphies et Spider Flash</p>
+
+    <label for="connexion-email">Adresse e-mail</label>
+    <input id="connexion-email" type="email" autocomplete="username" required>
+
+    <label for="connexion-mdp">Mot de passe</label>
+    <input id="connexion-mdp" type="password" autocomplete="current-password" required>
+
+    <button type="submit" class="bouton principal large">Se connecter</button>
+    <p class="message-erreur" id="connexion-erreur" hidden></p>
+    <p class="aide">
+      Vous n'avez pas encore de compte ? Demandez à votre administrateur de vous en créer un.
+    </p>
+  </form>
+</div>
+
+<!-- ========================= Application ========================= -->
+<div id="application" hidden>
+
+  <header class="entete">
+    <div class="entete-gauche">
+      <span class="logo">🫀</span>
+      <strong id="titre-cabinet">Planning Holter</strong>
+    </div>
+    <div class="entete-droite">
+      <span id="etat-connexion" class="pastille-etat" title="État de la liaison temps réel">●</span>
+      <span id="nom-utilisateur" class="nom-utilisateur"></span>
+      <button id="bouton-deconnexion" class="bouton discret" title="Se déconnecter">Quitter</button>
+    </div>
+  </header>
+
+  <div id="bandeau-alerte" class="bandeau-alerte" hidden></div>
+  <button id="bandeau-rappel" class="bandeau-rappel" type="button" hidden></button>
+
+  <nav class="onglets" role="tablist">
+    <button class="onglet actif" data-onglet="jour"       role="tab"><span>📋</span>Journée</button>
+    <button class="onglet"       data-onglet="rdv"        role="tab"><span>➕</span>Rendez-vous</button>
+    <button class="onglet"       data-onglet="recherche"  role="tab"><span>🔍</span>Recherche</button>
+    <button class="onglet"       data-onglet="calendrier" role="tab"><span>📅</span>Calendrier</button>
+    <button class="onglet"       data-onglet="parametres" role="tab"><span>⚙️</span>Réglages</button>
+  </nav>
+
+  <main>
+    <section id="vue-jour"        class="vue active"></section>
+    <section id="vue-rdv"         class="vue"></section>
+    <section id="vue-recherche"   class="vue"></section>
+    <section id="vue-calendrier"  class="vue"></section>
+    <section id="vue-parametres"  class="vue"></section>
+  </main>
+
+</div>
+
+<!-- Zone des messages temporaires et des fenêtres de confirmation -->
+<div id="notifications" class="notifications" aria-live="polite"></div>
+<div id="fenetre" class="fond-fenetre" hidden></div>
+
+<!-- Écran affiché tant que le fichier config.js n'est pas rempli -->
+<div id="ecran-configuration" class="ecran-connexion" hidden>
+  <div class="carte-connexion">
+    <h1>⚙️ Configuration à terminer</h1>
+    <p>Le fichier <code>config.js</code> n'a pas encore été complété avec l'adresse
+       du projet Supabase et sa clé publique.</p>
+    <p class="aide">Voir <code>docs/01-INSTALLATION.md</code>, étape 3.</p>
+  </div>
+</div>
+
+<script type="module" src="demo/demarrer-demo.js"></script>
+</body>
+</html>

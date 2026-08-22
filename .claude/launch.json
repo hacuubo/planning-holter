@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "planning-holter",
+      "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
+      "runtimeArgs": ["scripts/serveur-local.mjs"],
+      "port": 8080,
+      "url": "http://localhost:8080"
+    }
+  ]
+}
