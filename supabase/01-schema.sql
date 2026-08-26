@@ -80,7 +80,7 @@ create index if not exists rendez_vous_recherche_idx
 create index if not exists rendez_vous_statut_idx on public.rendez_vous (statut);
 
 comment on column public.rendez_vous.rdv_cardio is
-  'Heure du rendez-vous avec le cardiologue. La dépose du matériel a lieu 20 minutes avant.';
+  'Heure du rendez-vous avec le cardiologue. La dépose du matériel a lieu 15 minutes avant.';
 
 -- -----------------------------------------------------------------------------
 -- Poses de matériel (une ligne par appareil attribué à un rendez-vous)

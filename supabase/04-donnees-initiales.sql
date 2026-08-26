@@ -83,22 +83,47 @@ where not exists (
 -- -----------------------------------------------------------------------------
 insert into public.parametres (cle, valeur) values
   ('planification', jsonb_build_object(
-     'minutesAvantRdvCardio', 20,
-     'gestesParCreneau', 2,
+     'minutesAvantRdvCardio', 15,
+     'posesParCreneau', 1,
      'toleranceDureeMinutes', 60,
      'delaiReconditionnementMinutes', 0,
      'fenetreRechercheJours', 5,
      'alsaceMoselle', false,
      'fermeturesExceptionnelles', '{}'::jsonb
    )),
+  -- Plages de rendez-vous : matin et après-midi. `finPosePolygraphie`
+  -- prolonge l'après-midi pour les seules poses de polygraphie (pose
+  -- l'après-midi, dépose le lendemain matin, une seule nuit).
   ('horaires', jsonb_build_object(
      '0', null,
-     '1', jsonb_build_object('debut', '08:00', 'fin', '18:00'),
-     '2', jsonb_build_object('debut', '07:45', 'fin', '18:00'),
-     '3', jsonb_build_object('debut', '07:45', 'fin', '18:00'),
-     '4', jsonb_build_object('debut', '07:45', 'fin', '18:00'),
-     '5', jsonb_build_object('debut', '07:45', 'fin', '18:00'),
-     '6', jsonb_build_object('debut', '07:45', 'fin', '11:45')
+     '1', jsonb_build_object(
+        'plages', jsonb_build_array(
+          jsonb_build_object('debut', '08:45', 'fin', '11:30'),
+          jsonb_build_object('debut', '14:00', 'fin', '16:30')),
+        'finPosePolygraphie', '17:15'),
+     '2', jsonb_build_object(
+        'plages', jsonb_build_array(
+          jsonb_build_object('debut', '08:45', 'fin', '11:30'),
+          jsonb_build_object('debut', '14:00', 'fin', '16:30')),
+        'finPosePolygraphie', '17:15'),
+     '3', jsonb_build_object(
+        'plages', jsonb_build_array(
+          jsonb_build_object('debut', '08:45', 'fin', '11:30'),
+          jsonb_build_object('debut', '14:00', 'fin', '16:30')),
+        'finPosePolygraphie', '17:15'),
+     '4', jsonb_build_object(
+        'plages', jsonb_build_array(
+          jsonb_build_object('debut', '08:45', 'fin', '11:30'),
+          jsonb_build_object('debut', '14:00', 'fin', '16:30')),
+        'finPosePolygraphie', '17:15'),
+     '5', jsonb_build_object(
+        'plages', jsonb_build_array(
+          jsonb_build_object('debut', '08:45', 'fin', '11:30'),
+          jsonb_build_object('debut', '14:00', 'fin', '16:00')),
+        'finPosePolygraphie', '16:45'),
+     '6', jsonb_build_object(
+        'plages', jsonb_build_array(
+          jsonb_build_object('debut', '08:30', 'fin', '11:45')))
    )),
   ('cardiologues', '["MA","PL","RG","DC","AZ","LM","KS","GB","RB"]'::jsonb),
   ('sauvegarde', jsonb_build_object(
@@ -109,7 +134,7 @@ insert into public.parametres (cle, valeur) values
    )),
   ('cabinet', jsonb_build_object(
      'nom', 'Cabinet de cardiologie',
-     'version', '1.0.0'
+     'version', '1.1.0'
    ))
 on conflict (cle) do nothing;
 

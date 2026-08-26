@@ -8,6 +8,7 @@
 
 import {
   aujourdHui, dateEnFrancais, dateEnFrancaisLong, decouper, HORAIRES_PAR_DEFAUT,
+  normaliserHoraires,
 } from '../core/dates.js';
 import { CATEGORIES, libelleAppareil, libelleCourt } from '../core/materiel.js';
 import { appareilsLibres, choisirAppareil } from '../core/regles.js';
@@ -328,56 +329,102 @@ async function appliquerRemplacements(appareil, remplacements) {
 function sectionHoraires(admin) {
   const params = parametres();
   const horaires = { ...HORAIRES_PAR_DEFAUT, ...(etat.reglages.horaires || {}) };
-  const brouillon = JSON.parse(JSON.stringify(horaires));
-  let gestes = params.gestesParCreneau;
+  let poses = params.posesParCreneau;
   let minutesAvant = params.minutesAvantRdvCardio;
   let tolerance = params.toleranceDureeMinutes;
 
+  // État d'édition par jour : matin, après-midi (facultatif) et fin de la
+  // plage réservée aux poses de polygraphie.
+  const brouillon = {};
+  for (const jour of [0, 1, 2, 3, 4, 5, 6]) {
+    const h = normaliserHoraires(horaires[jour]);
+    const matin = h?.plages.find((p) => p.debut < '12:00') || null;
+    const apresMidi = h?.plages.find((p) => p.debut >= '12:00') || null;
+    brouillon[jour] = {
+      ouvert: !!h,
+      matin: { debut: matin?.debut || '08:45', fin: matin?.fin || '11:30' },
+      apresMidi: {
+        actif: !!apresMidi,
+        debut: apresMidi?.debut || '14:00',
+        fin: apresMidi?.fin || '16:30',
+      },
+      finPoly: (apresMidi && h?.finPosePolygraphie) || '',
+    };
+  }
+
+  const heure = (valeur, surChangement, desactive) => el('div', { style: 'width:104px' }, el('input', {
+    type: 'time', step: 900, value: valeur, disabled: desactive,
+    oninput: (e) => surChangement(e.target.value),
+  }));
+
   const lignes = [0, 1, 2, 3, 4, 5, 6].map((jour) => {
-    const h = brouillon[jour];
-    const ouvert = el('input', { type: 'checkbox', disabled: !admin });
-    ouvert.checked = !!h;
+    const b = brouillon[jour];
+    const ligne = el('div', { class: 'recap-ligne', style: 'flex-wrap:wrap' });
 
-    const debut = el('input', {
-      type: 'time', step: 900, value: h ? h.debut : '07:45', disabled: !admin || !h,
-      oninput: (e) => { if (brouillon[jour]) brouillon[jour].debut = e.target.value; },
-    });
-    const fin = el('input', {
-      type: 'time', step: 900, value: h ? h.fin : '18:00', disabled: !admin || !h,
-      oninput: (e) => { if (brouillon[jour]) brouillon[jour].fin = e.target.value; },
-    });
-
-    ouvert.addEventListener('input', (e) => {
-      brouillon[jour] = e.target.checked ? { debut: debut.value, fin: fin.value } : null;
-      debut.disabled = !e.target.checked;
-      fin.disabled = !e.target.checked;
-    });
-
-    return el(
-      'div',
-      { class: 'recap-ligne' },
-      ouvert,
+    const dessiner = () => remplir(
+      ligne,
+      (() => {
+        const c = el('input', {
+          type: 'checkbox', disabled: !admin,
+          oninput: (e) => { b.ouvert = e.target.checked; dessiner(); },
+        });
+        c.checked = b.ouvert;
+        return c;
+      })(),
       el('strong', { style: 'min-width:90px' }, NOMS_JOURS[jour]),
-      el('span', { class: 'aide' }, 'de'),
-      el('div', { style: 'width:120px' }, debut),
+      el('span', { class: 'aide' }, 'matin'),
+      heure(b.matin.debut, (v) => { b.matin.debut = v; }, !admin || !b.ouvert),
       el('span', { class: 'aide' }, 'à'),
-      el('div', { style: 'width:120px' }, fin),
+      heure(b.matin.fin, (v) => { b.matin.fin = v; }, !admin || !b.ouvert),
+      (() => {
+        const c = el('input', {
+          type: 'checkbox', disabled: !admin || !b.ouvert,
+          oninput: (e) => { b.apresMidi.actif = e.target.checked; dessiner(); },
+        });
+        c.checked = b.apresMidi.actif;
+        return el('label', { class: 'recap-ligne', style: 'gap:.35rem;margin-left:.6rem' },
+          c, el('span', { class: 'aide' }, 'après-midi'));
+      })(),
+      heure(b.apresMidi.debut, (v) => { b.apresMidi.debut = v; }, !admin || !b.ouvert || !b.apresMidi.actif),
+      el('span', { class: 'aide' }, 'à'),
+      heure(b.apresMidi.fin, (v) => { b.apresMidi.fin = v; }, !admin || !b.ouvert || !b.apresMidi.actif),
+      el('span', { class: 'aide', style: 'margin-left:.6rem' }, 'polygraphies jusqu’à'),
+      heure(b.finPoly, (v) => { b.finPoly = v; }, !admin || !b.ouvert || !b.apresMidi.actif),
     );
+    dessiner();
+    return ligne;
   });
+
+  const versReglage = () => {
+    const resultat = {};
+    for (const jour of [0, 1, 2, 3, 4, 5, 6]) {
+      const b = brouillon[jour];
+      if (!b.ouvert) { resultat[jour] = null; continue; }
+      const plages = [{ debut: b.matin.debut, fin: b.matin.fin }];
+      if (b.apresMidi.actif) plages.push({ debut: b.apresMidi.debut, fin: b.apresMidi.fin });
+      resultat[jour] = { plages };
+      if (b.apresMidi.actif && b.finPoly && b.finPoly > b.apresMidi.fin) {
+        resultat[jour].finPosePolygraphie = b.finPoly;
+      }
+    }
+    return resultat;
+  };
 
   return carte(
     'Horaires et capacité',
     el('p', { class: 'aide', style: 'margin-top:0' },
-      'L’heure de fin est celle du dernier créneau proposé. Les rendez-vous sont '
-      + 'espacés de 15 minutes.'),
+      'L’heure de fin est celle du dernier créneau proposé ; les rendez-vous sont espacés '
+      + 'de 15 minutes. La colonne « polygraphies jusqu’à » prolonge l’après-midi pour les '
+      + 'seules poses de polygraphie (elles se posent l’après-midi et se déposent le '
+      + 'lendemain matin, après une seule nuit).'),
     el('div', { class: 'recap' }, lignes),
     el(
       'div',
       { class: 'grille', style: 'margin-top:1rem' },
-      champ('Patients par quart d’heure', el('input', {
-        type: 'number', min: 1, max: 10, value: gestes, disabled: !admin,
-        oninput: (e) => { gestes = Number(e.target.value); },
-      }), { aide: 'Poses et déposes confondues.' }),
+      champ('Poses par quart d’heure', el('input', {
+        type: 'number', min: 1, max: 10, value: poses, disabled: !admin,
+        oninput: (e) => { poses = Number(e.target.value); },
+      }), { aide: 'Le nombre de déposes n’est pas limité.' }),
       champ('Dépose avant le RDV cardiologue (minutes)', el('input', {
         type: 'number', min: 0, max: 180, step: 5, value: minutesAvant, disabled: !admin,
         oninput: (e) => { minutesAvant = Number(e.target.value); },
@@ -391,10 +438,10 @@ function sectionHoraires(admin) {
       class: 'bouton principal',
       onclick: async () => {
         try {
-          await api.enregistrerParametre('horaires', brouillon);
+          await api.enregistrerParametre('horaires', versReglage());
           await api.enregistrerParametre('planification', {
             ...(etat.reglages.planification || {}),
-            gestesParCreneau: gestes,
+            posesParCreneau: poses,
             minutesAvantRdvCardio: minutesAvant,
             toleranceDureeMinutes: tolerance,
           });

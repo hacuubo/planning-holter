@@ -170,7 +170,11 @@ function feuilleProchainsJours(classeur, date, poses, appareils, parametres, nbJ
       parHeure.get(acte.heure).push(acte);
     }
 
-    for (const heure of creneauxDuJour(jour, parametres)) {
+    // Les actes hors des créneaux habituels (poses de polygraphie en fin de
+    // journée, réglages modifiés après coup) ne doivent jamais disparaître.
+    const creneaux = creneauxDuJour(jour, parametres);
+    const heuresSupplementaires = [...parHeure.keys()].filter((h) => !creneaux.includes(h));
+    for (const heure of [...creneaux, ...heuresSupplementaires].sort()) {
       const duCreneau = parHeure.get(heure) || [];
       if (duCreneau.length === 0) {
         lignes.push([{ v: heure, s: 'heure' }, { v: '—', s: 'cellule' }]);

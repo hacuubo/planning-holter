@@ -97,17 +97,26 @@ correspondant.
 | Message | Ce qu'il faut faire |
 |---------|---------------------|
 | *Aucun Holter ELA disponible : le logiciel a proposé un Holter DMS à la place.* | Rien — c'est une information. Vérifiez simplement que la marque convient au cardiologue. |
-| *Le créneau de dépose 09:30 est complet (2 patients maximum par quart d'heure).* | Décalez le rendez-vous cardiologue de 15 minutes. |
+| *Le créneau de pose du … est déjà pris par 1 patient(s) (maximum 1).* | Décalez le rendez-vous cardiologue de 15 minutes : la pose glissera sur un autre créneau. |
+| *La polygraphie se dépose le matin (avant midi).* | Choisissez un rendez-vous cardiologue en matinée. |
 | *Marge réduite : seulement 10 minutes entre la dépose et le rendez-vous.* | Le rendez-vous cardiologue est très tôt. Possible, mais serré. |
 | *Une autre secrétaire vient de réserver ce matériel.* | Rien — le logiciel recalcule automatiquement une nouvelle proposition. |
 | *Le cabinet est fermé ce jour-là.* | Dimanche, jour férié ou fermeture exceptionnelle : choisissez un autre jour. |
 
 ---
 
-## Onglet **Recherche** — retrouver ou annuler
+## Onglet **Recherche** — retrouver, déplacer ou annuler
 
 Tapez les premières lettres du nom de famille. La fiche affiche le rendez-vous
 cardiologue, les appareils attribués, les dates de pose et de dépose.
+
+**Déplacer / Modifier** ouvre une fenêtre préremplie avec le rendez-vous
+actuel : changez la date, l'heure ou le matériel (le type de Holter, par
+exemple) et le logiciel recalcule aussitôt la pose, la dépose et les appareils,
+comme lors d'une prise de rendez-vous. L'ancien créneau est libéré
+automatiquement à l'enregistrement. Si le nouveau créneau est impossible,
+d'autres rendez-vous sont proposés. Un rendez-vous dont le matériel est déjà
+posé ne peut plus être déplacé : annulez-le puis reprenez un rendez-vous.
 
 **Annuler le rendez-vous** libère immédiatement le matériel pour d'autres
 patients. Le rendez-vous n'est pas effacé : il reste consultable, marqué
@@ -138,8 +147,9 @@ encore, le logiciel refuse, **liste les patients concernés** et propose de tous
 les réattribuer automatiquement à d'autres appareils du même type. Vous validez
 en un clic.
 
-**Horaires et capacité** — jours d'ouverture, heure du premier et du dernier
-créneau, nombre de patients par quart d'heure.
+**Horaires et capacité** — jours d'ouverture, plages du matin et de
+l'après-midi, fin de la plage réservée aux poses de polygraphie, nombre de
+poses par quart d'heure.
 
 **Fermetures exceptionnelles** — congés, ponts. Les jours fériés français sont
 déjà connus du logiciel, il est inutile de les saisir.
@@ -158,23 +168,32 @@ par type de matériel, par cardiologue demandeur et par appareil.
 
 Vous n'avez pas à y penser, mais les connaître aide à comprendre ses réponses.
 
-1. La **dépose** a lieu 20 minutes avant le rendez-vous cardiologue, pour que le
+1. Les rendez-vous se prennent sur deux **plages** : le matin de 8h45 à 11h30
+   et l'après-midi de 14h00 à 16h30 (16h00 le vendredi) ; le samedi de 8h30 à
+   11h45, matin seulement.
+2. La **dépose** a lieu 15 minutes avant le rendez-vous cardiologue, pour que le
    résultat soit prêt pendant la consultation.
-2. La **pose** a lieu la durée de port avant la dépose : la veille pour 24 h,
+3. La **pose** a lieu la durée de port avant la dépose : la veille pour 24 h,
    l'avant-veille pour 48 h, et ainsi de suite ; 7 jours avant pour le Spider Flash.
-3. **La veille d'un lundi est le samedi.** Personne ne travaille du samedi midi
-   au lundi 8h : la dernière pose du samedi est à **11h45**, et le lundi
-   commence à **8h00**.
-4. Les **jours fériés** sont sautés automatiquement.
-5. Un appareil est **immobilisé de sa pose à son retour** : il ne peut être donné
+4. La **polygraphie ventilatoire** se pose **la veille, l'après-midi
+   uniquement** — sa plage est prolongée jusqu'à **17h15** (16h45 le vendredi),
+   réservée aux polygraphies — et se dépose **le lendemain matin, avant midi**,
+   après une seule nuit d'enregistrement. Le rendez-vous cardiologue doit donc
+   permettre une dépose en matinée, et il n'y a pas de polygraphie déposée le
+   lundi (la veille est un dimanche).
+5. **La veille d'un lundi est le samedi.** Personne ne travaille du samedi midi
+   au lundi matin.
+6. Les **jours fériés** sont sautés automatiquement.
+7. Un appareil est **immobilisé de sa pose à son retour** : il ne peut être donné
    à personne d'autre entre-temps, même une minute.
-6. **Deux patients maximum par quart d'heure**, poses et déposes confondues.
-   Un patient qui reçoit deux appareils ne compte que pour un.
-7. Les appareils **501 et 502** (ELA), **101** (DMS) et **Y** (MAPA) sont
+8. **Une pose maximum par quart d'heure.** Les **déposes ne sont pas
+   limitées** : plusieurs patients peuvent rendre leur matériel sur le même
+   créneau. Un patient qui reçoit deux appareils ne compte que pour un.
+9. Les appareils **501 et 502** (ELA), **101** (DMS) et **Y** (MAPA) sont
    **réservés aux urgences** : le logiciel ne les attribue jamais
    automatiquement.
-8. À matériel équivalent, le logiciel choisit l'appareil **revenu depuis le plus
-   longtemps**, pour user le parc de façon homogène.
+10. À matériel équivalent, le logiciel choisit l'appareil **revenu depuis le plus
+    longtemps**, pour user le parc de façon homogène.
 
 ---
 

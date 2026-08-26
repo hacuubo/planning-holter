@@ -179,12 +179,12 @@ de démarrer et d'ajuster après quelques semaines d'utilisation réelle.
 
 | Règle appliquée | Pourquoi ce choix | Où la changer |
 |-----------------|-------------------|---------------|
-| Le lundi ouvre à **8h00**, les autres jours à **7h45** | « personne ne travaille du samedi midi au lundi matin 8H » | Réglages ▸ Horaires |
-| Le dernier créneau est **18h00** inclus | « de 7H45 à 18H » | Réglages ▸ Horaires |
-| Le samedi, dernier geste à **11h45** | « dernière pose à 11H45 » | Réglages ▸ Horaires |
-| **2 patients** par quart d'heure, poses et déposes confondues | « 2 gestes par 15 minutes de pose et dépose » | Réglages ▸ Horaires |
+| Du lundi au vendredi : **8h45 – 11h30** et **14h00 – 16h30** (16h00 le vendredi) | plages de rendez-vous confirmées par le secrétariat | Réglages ▸ Horaires |
+| Le samedi : **8h30 – 11h45**, matin seulement | plages confirmées par le secrétariat | Réglages ▸ Horaires |
+| Poses de **polygraphie** : l'après-midi uniquement, jusqu'à **17h15** (16h45 le vendredi) ; dépose le lendemain **matin** (une seule nuit) | plage réservée demandée par le secrétariat | Réglages ▸ Horaires |
+| **1 pose** par quart d'heure ; **déposes illimitées** | demande du secrétariat | Réglages ▸ Horaires |
 | Un patient qui reçoit **2 appareils** ne compte que pour **1** patient dans le créneau | Il s'agit d'une seule venue | me le signaler si c'est faux |
-| La dépose peut avoir lieu **jusqu'à 20 min** avant le RDV cardiologue, arrondie au quart d'heure précédent | « la dépose s'effectue 20 minutes avant le rdv » | Réglages ▸ Horaires |
+| La dépose peut avoir lieu **jusqu'à 15 min** avant le RDV cardiologue, arrondie au quart d'heure précédent | « la dépose se passe 15 minutes avant le rendez-vous » | Réglages ▸ Horaires |
 | Un port **jusqu'à 1 h plus court** que la durée nominale est accepté | Évite de reculer d'un jour entier quand le cabinet ouvre plus tard | Réglages ▸ Horaires |
 | Un appareil rendu est **immédiatement** réattribuable | « une fois le retour effectué le matériel est rendu disponible » | me le dire s'il faut un délai de nettoyage |
 | Le Spider Flash se pose **7 jours** avant | « la durée du spider flash est de 7 jours » | — |

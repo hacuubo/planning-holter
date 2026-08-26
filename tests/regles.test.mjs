@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   appareilOccupe, appareilsLibres, chargeDesCreneaux, chevauche, choisirAppareil,
-  creneauDepose, creneauSature, creneauxPoseCandidats, disponibilitesParType,
-  placesRestantes, planifier, poseIdeale, propositionsAlternatives,
+  creneauDepose, creneauSature, creneauxPoseCandidats, creneauxPoseDuJour,
+  disponibilitesParType, placesRestantes, planifier, poseIdeale,
+  propositionsAlternatives,
 } from '../web/js/core/regles.js';
 import { INVENTAIRE_INITIAL } from '../web/js/core/materiel.js';
-import { ajouterJours } from '../web/js/core/dates.js';
+import { ajouterJours, decouper } from '../web/js/core/dates.js';
 
 /** Inventaire complet, avec un identifiant stable par appareil. */
 const APPAREILS = INVENTAIRE_INITIAL.map((a, i) => ({ ...a, id: `app-${i}`, actif: true }));
@@ -29,28 +30,28 @@ function pose(appareil, debut, fin, extra = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Dépose : 20 minutes avant le rendez-vous cardiologue
+// Dépose : 15 minutes avant le rendez-vous cardiologue
 // ---------------------------------------------------------------------------
 
-test('la dépose tombe sur le dernier créneau situé 20 min avant le RDV cardiologue', () => {
-  // Mardi 25/08/2026, RDV à 10:00 -> cible 09:40 -> dernier créneau 09:30
-  const d = creneauDepose('2026-08-25 10:00');
-  assert.equal(d.horodatage, '2026-08-25 09:30');
-  assert.equal(d.margeMinutes, 30);
+test('la dépose tombe sur le dernier créneau situé 15 min avant le RDV cardiologue', () => {
+  // Mardi 25/08/2026, RDV à 10:10 -> cible 09:55 -> dernier créneau 09:45
+  const d = creneauDepose('2026-08-25 10:10');
+  assert.equal(d.horodatage, '2026-08-25 09:45');
+  assert.equal(d.margeMinutes, 25);
   assert.equal(d.avertissement, null);
 });
 
-test('un RDV pile sur un créneau + 20 min utilise ce créneau', () => {
-  // RDV à 10:05 -> cible 09:45 -> créneau 09:45 exactement
-  const d = creneauDepose('2026-08-25 10:05');
+test('un RDV pile sur un créneau + 15 min utilise ce créneau', () => {
+  // RDV à 10:00 -> cible 09:45 -> créneau 09:45 exactement
+  const d = creneauDepose('2026-08-25 10:00');
   assert.equal(d.horodatage, '2026-08-25 09:45');
-  assert.equal(d.margeMinutes, 20);
+  assert.equal(d.margeMinutes, 15);
 });
 
 test('un RDV cardiologue trop matinal déclenche un avertissement de marge', () => {
-  // Lundi : ouverture 08:00. RDV à 08:10 -> cible 07:50, aucun créneau avant.
-  const d = creneauDepose('2026-08-24 08:10');
-  assert.equal(d.horodatage, '2026-08-24 08:00');
+  // Lundi : ouverture 08:45. RDV à 08:55 -> cible 08:40, aucun créneau avant.
+  const d = creneauDepose('2026-08-24 08:55');
+  assert.equal(d.horodatage, '2026-08-24 08:45');
   assert.equal(d.margeMinutes, 10);
   assert.match(d.avertissement, /Marge réduite/);
 });
@@ -93,14 +94,14 @@ test('pour un RDV le lundi, la pose bascule au samedi (dernier créneau utile)',
   assert.ok(!c.some((x) => x.horodatage.startsWith('2026-08-23')));
   assert.ok(!c.some((x) => x.horodatage.startsWith('2026-08-24')));
   // Les jours antérieurs restent des solutions de repli, moins bien classées.
-  assert.ok(c.slice(0, 17).every((x) => x.horodatage.startsWith('2026-08-22')));
+  assert.ok(c.slice(0, 14).every((x) => x.horodatage.startsWith('2026-08-22')));
 });
 
 test('la tolérance permet de rattraper une ouverture tardive', () => {
-  // Dépose mardi 07:45, 24 h -> pose idéale lundi 07:45, mais le lundi ouvre à 08:00.
-  // La tolérance de 60 min autorise une pose lundi 08:00 (23 h 45 de port).
-  const c = creneauxPoseCandidats('2026-08-25 07:45', 24);
-  assert.equal(c[0].horodatage, '2026-08-24 08:00');
+  // Dépose samedi 08:30, 24 h -> pose idéale vendredi 08:30, mais le vendredi
+  // ouvre à 08:45. La tolérance de 60 min autorise cette pose (23 h 45 de port).
+  const c = creneauxPoseCandidats('2026-08-22 08:30', 24);
+  assert.equal(c[0].horodatage, '2026-08-21 08:45');
   assert.equal(c[0].dureeReelleMinutes, 1425);
 });
 
@@ -190,7 +191,7 @@ test('un appareil jamais utilisé passe en premier', () => {
 // Charge des créneaux
 // ---------------------------------------------------------------------------
 
-test('un patient avec plusieurs appareils ne compte que pour un geste', () => {
+test('un patient avec plusieurs appareils ne compte que pour une pose', () => {
   const a51 = parCode('51', 'ELA');
   const mapaA = parCode('A');
   const poses = [
@@ -199,18 +200,18 @@ test('un patient avec plusieurs appareils ne compte que pour un geste', () => {
   ];
   const charge = chargeDesCreneaux(poses);
   assert.equal(charge.get('2026-08-24 09:30'), 1);
-  assert.equal(charge.get('2026-08-25 09:30'), 1);
+  // La dépose n'est pas comptée : elle n'est soumise à aucune limite.
+  assert.equal(charge.get('2026-08-25 09:30'), undefined);
 });
 
-test('le créneau est saturé au-delà de 2 gestes par quart d’heure', () => {
+test('le créneau est saturé dès 1 pose par quart d’heure', () => {
   const poses = [
     pose(parCode('51', 'ELA'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r1' }),
-    pose(parCode('52', 'ELA'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r2' }),
   ];
   const charge = chargeDesCreneaux(poses);
   assert.ok(creneauSature(charge, '2026-08-24 09:30'));
   assert.ok(!creneauSature(charge, '2026-08-24 09:45'));
-  assert.ok(!creneauSature(charge, '2026-08-24 09:30', { gestesParCreneau: 3 }));
+  assert.ok(!creneauSature(charge, '2026-08-24 09:30', { posesParCreneau: 2 }));
 });
 
 test('les horodatages venant de la base (avec secondes) comptent normalement', () => {
@@ -218,25 +219,24 @@ test('les horodatages venant de la base (avec secondes) comptent normalement', (
   // Sans normalisation, les deux formes comptaient comme deux créneaux
   // distincts et la limite de patients par quart d'heure ne s'appliquait plus.
   const avecSecondes = [
-    { id: 'p1', rdv_id: 'r1', appareil_id: 'a1', debut: '2026-08-24 09:30:00', fin: '2026-08-25 09:30:00', statut: 'prevu' },
-    { id: 'p2', rdv_id: 'r2', appareil_id: 'a2', debut: '2026-08-24 09:30:00', fin: '2026-08-25 09:30:00', statut: 'prevu' },
+    { id: 'p1', rdv_id: 'r1', appareil_id: 'a1', debut: '2026-08-24 09:45:00', fin: '2026-08-25 09:45:00', statut: 'prevu' },
   ];
   const charge = chargeDesCreneaux(avecSecondes);
 
-  assert.equal(charge.get('2026-08-24 09:30'), 2, 'les secondes doivent être ignorées');
-  assert.ok(creneauSature(charge, '2026-08-24 09:30'));
-  assert.ok(creneauSature(charge, '2026-08-24 09:30:00'), 'les deux écritures doivent être équivalentes');
-  assert.equal(placesRestantes(charge, '2026-08-24 09:30:00'), 0);
+  assert.equal(charge.get('2026-08-24 09:45'), 1, 'les secondes doivent être ignorées');
+  assert.ok(creneauSature(charge, '2026-08-24 09:45'));
+  assert.ok(creneauSature(charge, '2026-08-24 09:45:00'), 'les deux écritures doivent être équivalentes');
+  assert.equal(placesRestantes(charge, '2026-08-24 09:45:00'), 0);
 
-  // Et le planificateur doit refuser d'ajouter un troisième patient.
+  // Et le planificateur doit éviter ce créneau de pose déjà pris.
   const plan = planifier({
     rdvCardio: '2026-08-25 10:00',
     materiels: [{ categorie: 'mapa', dureeHeures: 24 }],
     appareils: APPAREILS,
     poses: avecSecondes,
   });
-  assert.ok(!plan.possible, 'le créneau de dépose de 09:30 est déjà complet');
-  assert.ok(plan.avertissements.some((a) => /créneau de dépose/.test(a)));
+  assert.ok(plan.possible);
+  assert.notEqual(plan.lignes[0].pose, '2026-08-24 09:45', 'le créneau de pose 09:45 est déjà pris');
 });
 
 test('aucun créneau ne dépasse jamais la capacité, même sur un planning chargé', () => {
@@ -246,7 +246,7 @@ test('aucun créneau ne dépasse jamais la capacité, même sur un planning char
   const poses = [];
   let n = 0;
   for (let jour = 0; jour < 12; jour++) {
-    for (const heure of ['08:30', '09:00', '10:15', '11:00', '14:30', '16:00']) {
+    for (const heure of ['09:00', '09:45', '10:15', '11:00', '14:30', '16:00']) {
       for (let essai = 0; essai < 3; essai++) {
         const plan = planifier({
           rdvCardio: `${ajouterJours('2026-09-01', jour)} ${heure}`,
@@ -273,18 +273,28 @@ test('aucun créneau ne dépasse jamais la capacité, même sur un planning char
   assert.ok(n > 30, `le jeu d’essai doit être conséquent (${n} rendez-vous)`);
 
   const charge = chargeDesCreneaux(poses);
-  const depassements = [...charge.entries()].filter(([, nb]) => nb > 2);
-  assert.deepEqual(depassements, [], 'aucun créneau ne doit dépasser 2 patients');
+  const depassements = [...charge.entries()].filter(([, nb]) => nb > 1);
+  assert.deepEqual(depassements, [], 'aucun créneau de pose ne doit dépasser 1 patient');
 });
 
-test('la dépose consomme aussi une place dans son créneau', () => {
+test('les déposes ne consomment aucune place : elles sont illimitées', () => {
   const poses = [
-    pose(parCode('51', 'ELA'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r1' }),
-    pose(parCode('52', 'ELA'), '2026-08-24 10:00', '2026-08-25 09:30', { rdv_id: 'r2' }),
+    pose(parCode('51', 'ELA'), '2026-08-24 09:30', '2026-08-25 09:45', { rdv_id: 'r1' }),
+    pose(parCode('52', 'ELA'), '2026-08-24 10:00', '2026-08-25 09:45', { rdv_id: 'r2' }),
   ];
   const charge = chargeDesCreneaux(poses);
-  assert.equal(charge.get('2026-08-25 09:30'), 2);
-  assert.ok(creneauSature(charge, '2026-08-25 09:30'));
+  assert.equal(charge.get('2026-08-25 09:45'), undefined);
+  assert.ok(!creneauSature(charge, '2026-08-25 09:45'));
+
+  // Un troisième patient peut donc déposer au même moment.
+  const plan = planifier({
+    rdvCardio: '2026-08-25 10:00',
+    materiels: [{ categorie: 'mapa', dureeHeures: 24 }],
+    appareils: APPAREILS,
+    poses,
+  });
+  assert.ok(plan.possible);
+  assert.equal(plan.depose, '2026-08-25 09:45');
 });
 
 // ---------------------------------------------------------------------------
@@ -299,9 +309,9 @@ test('planification simple d’un Holter ECG 24 h', () => {
     poses: [],
   });
   assert.ok(plan.possible);
-  assert.equal(plan.depose, '2026-08-25 09:30');
+  assert.equal(plan.depose, '2026-08-25 09:45');
   assert.equal(plan.lignes.length, 1);
-  assert.equal(plan.lignes[0].pose, '2026-08-24 09:30');
+  assert.equal(plan.lignes[0].pose, '2026-08-24 09:45');
   assert.equal(plan.lignes[0].appareil.marque, 'ELA');
   assert.equal(plan.lignes[0].dureeReelleMinutes, 1440);
 });
@@ -334,8 +344,8 @@ test('des durées différentes donnent des poses à des dates différentes', () 
   });
   assert.ok(plan.possible);
   const poses = plan.lignes.map((l) => l.pose).sort();
-  assert.equal(poses[0], '2026-08-18 09:30'); // Spider Flash : 7 jours avant
-  assert.equal(poses[1], '2026-08-24 09:30'); // Holter : la veille
+  assert.equal(poses[0], '2026-08-18 09:45'); // Spider Flash : 7 jours avant
+  assert.equal(poses[1], '2026-08-24 09:45'); // Holter : la veille
 });
 
 test('deux appareils identiques demandés reçoivent deux numéros différents', () => {
@@ -363,7 +373,7 @@ test('redirection ELA -> DMS quand tous les ELA sont pris', () => {
     materiels: [{ categorie: 'holter_ecg', marque: 'ELA', dureeHeures: 24 }],
     appareils: APPAREILS,
     poses,
-    parametres: { gestesParCreneau: 99 },
+    parametres: { posesParCreneau: 99 },
   });
   assert.ok(plan.possible);
   assert.equal(plan.lignes[0].appareil.marque, 'DMS');
@@ -381,7 +391,7 @@ test('impossibilité annoncée quand plus aucun Holter n’est libre', () => {
     materiels: [{ categorie: 'holter_ecg', marque: 'ELA', dureeHeures: 24 }],
     appareils: APPAREILS,
     poses,
-    parametres: { gestesParCreneau: 99 },
+    parametres: { posesParCreneau: 99 },
   });
   assert.ok(!plan.possible);
   assert.equal(plan.lignes[0].appareil, null);
@@ -390,8 +400,7 @@ test('impossibilité annoncée quand plus aucun Holter n’est libre', () => {
 
 test('un créneau de pose saturé fait glisser vers un autre créneau', () => {
   const poses = [
-    pose(parCode('1', 'DMS'), '2026-08-24 09:30', '2026-08-24 18:00', { rdv_id: 'r1' }),
-    pose(parCode('2', 'DMS'), '2026-08-24 09:30', '2026-08-24 18:00', { rdv_id: 'r2' }),
+    pose(parCode('1', 'DMS'), '2026-08-24 09:45', '2026-08-24 16:30', { rdv_id: 'r1' }),
   ];
   const plan = planifier({
     rdvCardio: '2026-08-25 10:00',
@@ -400,24 +409,94 @@ test('un créneau de pose saturé fait glisser vers un autre créneau', () => {
     poses,
   });
   assert.ok(plan.possible);
-  assert.notEqual(plan.lignes[0].pose, '2026-08-24 09:30');
-  // Le créneau retenu reste proche : 09:15 ou 09:45.
-  assert.ok(['2026-08-24 09:15', '2026-08-24 09:45'].includes(plan.lignes[0].pose));
+  assert.notEqual(plan.lignes[0].pose, '2026-08-24 09:45');
+  // Le créneau retenu reste proche : 09:30 ou 10:00.
+  assert.ok(['2026-08-24 09:30', '2026-08-24 10:00'].includes(plan.lignes[0].pose));
 });
 
-test('un créneau de dépose saturé bloque la prise de rendez-vous', () => {
-  const poses = [
-    pose(parCode('1', 'DMS'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r1' }),
-    pose(parCode('2', 'DMS'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r2' }),
-  ];
+// ---------------------------------------------------------------------------
+// Polygraphie ventilatoire : pose l'après-midi, dépose le lendemain matin
+// ---------------------------------------------------------------------------
+
+test('les créneaux de pose de polygraphie sont l’après-midi, prolongés à 17:15', () => {
+  // Mardi : après-midi 14:00 -> 16:30, prolongé jusqu'à 17:15 pour les polygraphies.
+  const mardi = creneauxPoseDuJour('2026-08-25', 'polygraphie');
+  assert.equal(mardi[0], '14:00');
+  assert.equal(mardi.at(-1), '17:15');
+  assert.ok(!mardi.includes('11:30'), 'jamais le matin');
+
+  // Vendredi : prolongé jusqu'à 16:45 seulement.
+  assert.equal(creneauxPoseDuJour('2026-08-21', 'polygraphie').at(-1), '16:45');
+
+  // Samedi : pas d'après-midi, donc aucune pose de polygraphie.
+  assert.deepEqual(creneauxPoseDuJour('2026-08-22', 'polygraphie'), []);
+
+  // Les autres matériels gardent tous les créneaux de la journée.
+  assert.equal(creneauxPoseDuJour('2026-08-25', 'holter_ecg')[0], '08:45');
+  assert.equal(creneauxPoseDuJour('2026-08-25', 'holter_ecg').at(-1), '16:30');
+});
+
+test('la polygraphie se pose la veille en fin d’après-midi (une seule nuit)', () => {
   const plan = planifier({
-    rdvCardio: '2026-08-25 10:00',
-    materiels: [{ categorie: 'mapa', dureeHeures: 24 }],
+    rdvCardio: '2026-08-25 10:00', // mardi matin
+    materiels: [{ categorie: 'polygraphie', dureeHeures: 24 }],
     appareils: APPAREILS,
-    poses,
+    poses: [],
+  });
+  assert.ok(plan.possible);
+  assert.equal(plan.depose, '2026-08-25 09:45');
+  // Le créneau le plus tardif est proposé d'abord : il est réservé aux polygraphies.
+  assert.equal(plan.lignes[0].pose, '2026-08-24 17:15');
+});
+
+test('le vendredi, la pose de polygraphie va jusqu’à 16:45 (dépose le samedi matin)', () => {
+  const plan = planifier({
+    rdvCardio: '2026-08-22 10:00', // samedi matin
+    materiels: [{ categorie: 'polygraphie', dureeHeures: 24 }],
+    appareils: APPAREILS,
+    poses: [],
+  });
+  assert.ok(plan.possible);
+  assert.equal(plan.lignes[0].pose, '2026-08-21 16:45');
+});
+
+test('une polygraphie l’après-midi est refusée : la dépose a lieu le matin', () => {
+  const plan = planifier({
+    rdvCardio: '2026-08-25 15:00',
+    materiels: [{ categorie: 'polygraphie', dureeHeures: 24 }],
+    appareils: APPAREILS,
+    poses: [],
   });
   assert.ok(!plan.possible);
-  assert.ok(plan.avertissements.some((a) => /créneau de dépose/.test(a)));
+  assert.match(plan.lignes[0].motifEchec, /matin/);
+});
+
+test('pas de polygraphie le lundi : la veille (dimanche) est fermée', () => {
+  const plan = planifier({
+    rdvCardio: '2026-08-24 10:00', // lundi matin
+    materiels: [{ categorie: 'polygraphie', dureeHeures: 24 }],
+    appareils: APPAREILS,
+    poses: [],
+  });
+  assert.ok(!plan.possible);
+  assert.match(plan.lignes[0].motifEchec, /veille/);
+});
+
+test('polygraphie + Holter : le Holter garde ses propres créneaux de pose', () => {
+  const plan = planifier({
+    rdvCardio: '2026-08-25 10:00',
+    materiels: [
+      { categorie: 'polygraphie', dureeHeures: 24 },
+      { categorie: 'holter_ecg', marque: 'DMS', dureeHeures: 24 },
+    ],
+    appareils: APPAREILS,
+    poses: [],
+  });
+  assert.ok(plan.possible);
+  const poly = plan.lignes.find((l) => l.appareil.categorie === 'polygraphie');
+  const holter = plan.lignes.find((l) => l.appareil.categorie === 'holter_ecg');
+  assert.equal(poly.pose, '2026-08-24 17:15');
+  assert.equal(holter.pose, '2026-08-24 09:45'); // la veille à la même heure
 });
 
 // ---------------------------------------------------------------------------
@@ -425,20 +504,20 @@ test('un créneau de dépose saturé bloque la prise de rendez-vous', () => {
 // ---------------------------------------------------------------------------
 
 test('des rendez-vous de remplacement sont proposés', () => {
-  const poses = [
-    pose(parCode('1', 'DMS'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r1' }),
-    pose(parCode('2', 'DMS'), '2026-08-24 09:30', '2026-08-25 09:30', { rdv_id: 'r2' }),
-  ];
+  // Polygraphie demandée l'après-midi : impossible (elle se dépose le matin),
+  // le logiciel propose alors des rendez-vous en matinée.
   const propositions = propositionsAlternatives({
-    rdvCardio: '2026-08-25 10:00',
-    materiels: [{ categorie: 'mapa', dureeHeures: 24 }],
+    rdvCardio: '2026-08-25 15:00',
+    materiels: [{ categorie: 'polygraphie', dureeHeures: 24 }],
     appareils: APPAREILS,
-    poses,
+    poses: [],
   });
   assert.ok(propositions.length > 0);
   assert.ok(propositions.every((p) => p.plan.possible));
-  // Les propositions sont ordonnées : les plus proches de l'heure souhaitée d'abord.
+  // Les propositions sont ordonnées : les plus proches de la date souhaitée d'abord.
   assert.ok(propositions[0].rdvCardio.startsWith('2026-08-25'));
+  // Quelle que soit l'heure du rendez-vous proposé, la dépose a lieu le matin.
+  assert.ok(propositions.every((p) => decouper(p.plan.depose).heure < '12:00'));
 });
 
 test('les propositions ne dépassent pas le nombre demandé', () => {

@@ -28,13 +28,15 @@ returns void language sql security definer set search_path = public as $$
 $$;
 
 -- -----------------------------------------------------------------------------
--- Nombre maximal de gestes par quart d'heure (lu dans les paramètres)
+-- Nombre maximal de POSES par quart d'heure (lu dans les paramètres).
+-- Les déposes ne sont pas limitées : seul le créneau de pose est contrôlé.
 -- -----------------------------------------------------------------------------
-create or replace function public.gestes_par_creneau()
+drop function if exists public.gestes_par_creneau();
+create or replace function public.poses_par_creneau()
 returns integer language sql stable security definer set search_path = public as $$
   select coalesce(
-    (select (valeur ->> 'gestesParCreneau')::int from public.parametres where cle = 'planification'),
-    2
+    (select (valeur ->> 'posesParCreneau')::int from public.parametres where cle = 'planification'),
+    1
   );
 $$;
 
@@ -53,39 +55,36 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 
 -- -----------------------------------------------------------------------------
--- Contrôle de la charge d'un quart d'heure
--- Un patient qui reçoit plusieurs appareils au même moment ne compte que
--- pour un seul geste.
+-- Contrôle de la charge d'un quart d'heure : seules les POSES sont comptées
+-- (les déposes accueillent un nombre illimité de patients). Un patient qui
+-- reçoit plusieurs appareils au même moment ne compte que pour une pose.
 -- -----------------------------------------------------------------------------
 create or replace function public.verifier_capacite_creneau()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
-  v_max      integer := public.gestes_par_creneau();
-  v_creneau  timestamp;
-  v_nb       integer;
+  v_max integer := public.poses_par_creneau();
+  v_nb  integer;
 begin
   if new.statut = 'annule' then
     return new;
   end if;
 
-  foreach v_creneau in array array[new.debut, new.fin] loop
-    -- Sérialise les réservations concurrentes portant sur le même quart d'heure.
-    perform pg_advisory_xact_lock(hashtext('creneau:' || v_creneau::text));
+  -- Sérialise les réservations concurrentes portant sur le même quart d'heure.
+  perform pg_advisory_xact_lock(hashtext('creneau:' || new.debut::text));
 
-    select count(distinct rdv_id) into v_nb
-    from public.poses
-    where statut <> 'annule'
-      and rdv_id <> new.rdv_id
-      and id is distinct from new.id
-      and (debut = v_creneau or fin = v_creneau);
+  select count(distinct rdv_id) into v_nb
+  from public.poses
+  where statut <> 'annule'
+    and rdv_id <> new.rdv_id
+    and id is distinct from new.id
+    and debut = new.debut;
 
-    if v_nb + 1 > v_max then
-      raise exception
-        'CRENEAU_COMPLET: le créneau du % est déjà pris par % patient(s) (maximum %).',
-        to_char(v_creneau, 'DD/MM/YYYY à HH24:MI'), v_nb, v_max
-        using errcode = 'check_violation';
-    end if;
-  end loop;
+  if v_nb + 1 > v_max then
+    raise exception
+      'CRENEAU_COMPLET: le créneau de pose du % est déjà pris par % patient(s) (maximum %).',
+      to_char(new.debut, 'DD/MM/YYYY à HH24:MI'), v_nb, v_max
+      using errcode = 'check_violation';
+  end if;
 
   return new;
 end $$;
@@ -238,6 +237,81 @@ begin
 
   perform public.journaliser('rendez-vous annulé', p_rdv_id::text,
     jsonb_build_object('motif', p_motif));
+end $$;
+
+-- =============================================================================
+--  DÉPLACEMENT / MODIFICATION D'UN RENDEZ-VOUS (opération unique et indivisible)
+-- =============================================================================
+--  Nouvelle date/heure de rendez-vous cardiologue et nouvelle liste de
+--  matériels (changer le type de Holter, par exemple). Les anciennes poses
+--  prévues sont annulées et remplacées d'un seul tenant : soit tout le
+--  déplacement réussit, soit rien ne change.
+-- =============================================================================
+create or replace function public.deplacer_rendez_vous(p_rdv_id uuid, p_rdv_cardio timestamp, p_lignes jsonb)
+returns jsonb language plpgsql security invoker set search_path = public as $$
+declare
+  v_rdv    public.rendez_vous%rowtype;
+  v_ligne  jsonb;
+  v_nb     integer := 0;
+begin
+  if not public.est_actif() then
+    raise exception 'ACCES_REFUSE: votre compte n''est pas autorisé à modifier des rendez-vous.';
+  end if;
+
+  if jsonb_array_length(p_lignes) = 0 then
+    raise exception 'AUCUN_MATERIEL: sélectionnez au moins un matériel à poser.';
+  end if;
+
+  select * into v_rdv from public.rendez_vous where id = p_rdv_id for update;
+  if v_rdv.id is null then
+    raise exception 'RDV_INTROUVABLE: ce rendez-vous n''existe plus.';
+  end if;
+  if v_rdv.statut = 'annule' then
+    raise exception 'RDV_ANNULE: un rendez-vous annulé ne peut pas être déplacé.';
+  end if;
+
+  -- Du matériel déjà posé (ou rendu) ne peut plus être déplacé.
+  if exists (
+    select 1 from public.poses
+    where rdv_id = p_rdv_id and statut in ('pose', 'rendu')
+  ) then
+    raise exception 'MATERIEL_DEJA_POSE: le matériel de ce rendez-vous est déjà posé.';
+  end if;
+
+  update public.rendez_vous set rdv_cardio = p_rdv_cardio where id = p_rdv_id;
+
+  -- Les anciennes poses prévues sont annulées, puis remplacées.
+  update public.poses set statut = 'annule'
+  where rdv_id = p_rdv_id and statut = 'prevu';
+
+  for v_ligne in select * from jsonb_array_elements(p_lignes) loop
+    insert into public.poses (rdv_id, appareil_id, duree_heures, marque_demandee, debut, fin)
+    values (
+      p_rdv_id,
+      (v_ligne ->> 'appareil_id')::uuid,
+      (v_ligne ->> 'duree_heures')::int,
+      nullif(v_ligne ->> 'marque_demandee', ''),
+      (v_ligne ->> 'debut')::timestamp,
+      (v_ligne ->> 'fin')::timestamp
+    );
+    v_nb := v_nb + 1;
+  end loop;
+
+  perform public.journaliser('rendez-vous déplacé', p_rdv_id::text,
+    jsonb_build_object(
+      'patient', v_rdv.patient_nom,
+      'ancien_rdv', v_rdv.rdv_cardio,
+      'nouveau_rdv', p_rdv_cardio,
+      'appareils', v_nb));
+
+  return jsonb_build_object('id', p_rdv_id, 'appareils', v_nb);
+
+exception
+  when exclusion_violation then
+    raise exception
+      'CONFLIT_APPAREIL: une autre secrétaire vient d''attribuer ce matériel. '
+      'Le logiciel va recalculer une proposition à jour.'
+      using errcode = 'exclusion_violation';
 end $$;
 
 -- =============================================================================
@@ -412,6 +486,7 @@ $$;
 -- =============================================================================
 grant execute on function
   public.reserver_rendez_vous(jsonb, jsonb),
+  public.deplacer_rendez_vous(uuid, timestamp, jsonb),
   public.annuler_rendez_vous(uuid, text),
   public.enregistrer_retour(uuid, timestamp),
   public.enregistrer_pose(uuid),
