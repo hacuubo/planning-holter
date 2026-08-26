@@ -150,7 +150,7 @@ function choixMateriels() {
 
     const controles = [];
     if (categorie === 'holter_ecg') {
-      controles.push(el('label', { class: 'aide' }, 'Marque : '), selection(
+      controles.push(el('label', { class: 'aide paire' }, 'Marque :', selection(
         [
           { valeur: 'indifferent', libelle: 'Indifférente' },
           { valeur: 'ELA', libelle: 'ELA' },
@@ -159,16 +159,16 @@ function choixMateriels() {
         m.marque,
         (v) => { m.marque = v; recalculer(); },
         { style: 'width:auto' },
-      ));
+      )));
     }
     const durees = dureesAutorisees(categorie);
     if (durees.length > 1) {
-      controles.push(el('label', { class: 'aide' }, 'Durée : '), selection(
+      controles.push(el('label', { class: 'aide paire' }, 'Durée :', selection(
         durees.map((d) => ({ valeur: d, libelle: dureeLisible(d) })),
         m.duree,
         (v) => { m.duree = Number(v); recalculer(); },
         { style: 'width:auto' },
-      ));
+      )));
     } else {
       controles.push(el('span', { class: 'aide' }, `Durée : ${dureeLisible(durees[0])}`));
     }

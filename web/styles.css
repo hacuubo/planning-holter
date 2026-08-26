@@ -373,6 +373,35 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 .recap-ligne { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .35rem 0; }
 .recap-ligne + .recap-ligne { border-top: 1px dashed var(--bord-fort); }
 
+/* ------------------------------------------- Réglages : horaires du cabinet
+   Un encadré par jour. Une grille à colonnes fixes aligne les libellés et
+   les champs d'heure : rien ne se replie n'importe comment, même sur la
+   largeur d'un téléphone. */
+.horaires-jours { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.horaires-jour { border: 1px solid var(--bord); border-radius: 8px; background: var(--surface); padding: .55rem .7rem .65rem; }
+.horaires-jour.ferme { background: var(--fond); }
+.horaires-entete { display: flex; align-items: center; gap: .5rem; cursor: pointer; padding: .1rem 0; }
+.horaires-entete .aide { margin-left: auto; }
+.horaires-plage {
+  display: grid; align-items: center; gap: .3rem .45rem;
+  grid-template-columns: minmax(6.4rem, auto) minmax(0, 1fr) auto minmax(0, 1fr);
+  margin-top: .4rem;
+}
+.horaires-plage.inactif { opacity: .45; }
+.horaires-libelle { font-size: .85rem; color: var(--texte-doux); display: flex; align-items: center; gap: .4rem; cursor: pointer; }
+.horaires-mot { font-size: .85rem; color: var(--texte-doux); text-align: center; }
+.horaires-plage input[type="time"] { width: 100%; min-width: 0; padding: .45rem .4rem; text-align: center; }
+
+/* Étiquette + liste déroulante qui restent soudées (Marque : ELA, Durée : 24 h) */
+.paire { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .horaires-plage { grid-template-columns: minmax(5.8rem, auto) minmax(0, 1fr) auto minmax(0, 1fr); gap: .3rem .35rem; }
+  /* Sur petit écran, l'icône d'horloge est sacrifiée pour que l'heure
+     complète reste lisible, même en format 12 h. */
+  .horaires-plage input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+}
+
 /* ------------------------------------------------------------- Téléphone */
 @media (max-width: 640px) {
   main { padding: .7rem; }
