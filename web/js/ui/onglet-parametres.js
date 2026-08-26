@@ -352,47 +352,66 @@ function sectionHoraires(admin) {
     };
   }
 
-  const heure = (valeur, surChangement, desactive) => el('div', { style: 'width:104px' }, el('input', {
+  const heure = (valeur, surChangement, desactive) => el('input', {
     type: 'time', step: 900, value: valeur, disabled: desactive,
     oninput: (e) => surChangement(e.target.value),
-  }));
+  });
 
+  const caseACocher = (cochee, desactive, surChangement) => {
+    const c = el('input', { type: 'checkbox', disabled: desactive, oninput: (e) => surChangement(e.target.checked) });
+    c.checked = cochee;
+    return c;
+  };
+
+  // Un encadré par jour : « Matin … à … », « Après-midi … à … » et
+  // « Polygraphie jusqu'à … », alignés sur une grille (voir styles.css).
   const lignes = [0, 1, 2, 3, 4, 5, 6].map((jour) => {
     const b = brouillon[jour];
-    const ligne = el('div', { class: 'recap-ligne', style: 'flex-wrap:wrap' });
+    const bloc = el('div', {});
 
-    const dessiner = () => remplir(
-      ligne,
-      (() => {
-        const c = el('input', {
-          type: 'checkbox', disabled: !admin,
-          oninput: (e) => { b.ouvert = e.target.checked; dessiner(); },
-        });
-        c.checked = b.ouvert;
-        return c;
-      })(),
-      el('strong', { style: 'min-width:90px' }, NOMS_JOURS[jour]),
-      el('span', { class: 'aide' }, 'matin'),
-      heure(b.matin.debut, (v) => { b.matin.debut = v; }, !admin || !b.ouvert),
-      el('span', { class: 'aide' }, 'à'),
-      heure(b.matin.fin, (v) => { b.matin.fin = v; }, !admin || !b.ouvert),
-      (() => {
-        const c = el('input', {
-          type: 'checkbox', disabled: !admin || !b.ouvert,
-          oninput: (e) => { b.apresMidi.actif = e.target.checked; dessiner(); },
-        });
-        c.checked = b.apresMidi.actif;
-        return el('label', { class: 'recap-ligne', style: 'gap:.35rem;margin-left:.6rem' },
-          c, el('span', { class: 'aide' }, 'après-midi'));
-      })(),
-      heure(b.apresMidi.debut, (v) => { b.apresMidi.debut = v; }, !admin || !b.ouvert || !b.apresMidi.actif),
-      el('span', { class: 'aide' }, 'à'),
-      heure(b.apresMidi.fin, (v) => { b.apresMidi.fin = v; }, !admin || !b.ouvert || !b.apresMidi.actif),
-      el('span', { class: 'aide', style: 'margin-left:.6rem' }, 'polygraphies jusqu’à'),
-      heure(b.finPoly, (v) => { b.finPoly = v; }, !admin || !b.ouvert || !b.apresMidi.actif),
-    );
+    const dessiner = () => {
+      bloc.className = `horaires-jour${b.ouvert ? '' : ' ferme'}`;
+      remplir(
+        bloc,
+        el(
+          'label',
+          { class: 'horaires-entete' },
+          caseACocher(b.ouvert, !admin, (v) => { b.ouvert = v; dessiner(); }),
+          el('strong', {}, NOMS_JOURS[jour]),
+          b.ouvert ? null : el('span', { class: 'aide' }, 'fermé'),
+        ),
+        !b.ouvert ? null : el(
+          'div',
+          { class: 'horaires-plage' },
+          el('span', { class: 'horaires-libelle' }, 'Matin'),
+          heure(b.matin.debut, (v) => { b.matin.debut = v; }, !admin),
+          el('span', { class: 'horaires-mot' }, 'à'),
+          heure(b.matin.fin, (v) => { b.matin.fin = v; }, !admin),
+        ),
+        !b.ouvert ? null : el(
+          'div',
+          { class: `horaires-plage${b.apresMidi.actif ? '' : ' inactif'}` },
+          el(
+            'label',
+            { class: 'horaires-libelle' },
+            caseACocher(b.apresMidi.actif, !admin, (v) => { b.apresMidi.actif = v; dessiner(); }),
+            'Après-midi',
+          ),
+          heure(b.apresMidi.debut, (v) => { b.apresMidi.debut = v; }, !admin || !b.apresMidi.actif),
+          el('span', { class: 'horaires-mot' }, 'à'),
+          heure(b.apresMidi.fin, (v) => { b.apresMidi.fin = v; }, !admin || !b.apresMidi.actif),
+        ),
+        !b.ouvert || !b.apresMidi.actif ? null : el(
+          'div',
+          { class: 'horaires-plage' },
+          el('span', { class: 'horaires-libelle' }, 'Polygraphie'),
+          el('span', { class: 'horaires-mot', style: 'grid-column: 2 / 4; justify-self: end' }, 'jusqu’à'),
+          heure(b.finPoly, (v) => { b.finPoly = v; }, !admin),
+        ),
+      );
+    };
     dessiner();
-    return ligne;
+    return bloc;
   });
 
   const versReglage = () => {
@@ -414,10 +433,10 @@ function sectionHoraires(admin) {
     'Horaires et capacité',
     el('p', { class: 'aide', style: 'margin-top:0' },
       'L’heure de fin est celle du dernier créneau proposé ; les rendez-vous sont espacés '
-      + 'de 15 minutes. La colonne « polygraphies jusqu’à » prolonge l’après-midi pour les '
+      + 'de 15 minutes. La ligne « Polygraphie jusqu’à » prolonge l’après-midi pour les '
       + 'seules poses de polygraphie (elles se posent l’après-midi et se déposent le '
       + 'lendemain matin, après une seule nuit).'),
-    el('div', { class: 'recap' }, lignes),
+    el('div', { class: 'horaires-jours' }, lignes),
     el(
       'div',
       { class: 'grille', style: 'margin-top:1rem' },
