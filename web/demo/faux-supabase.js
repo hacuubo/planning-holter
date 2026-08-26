@@ -39,8 +39,8 @@ const base = {
     {
       cle: 'planification',
       valeur: {
-        minutesAvantRdvCardio: 20,
-        gestesParCreneau: 2,
+        minutesAvantRdvCardio: 15,
+        posesParCreneau: 1,
         toleranceDureeMinutes: 60,
         delaiReconditionnementMinutes: 0,
         fenetreRechercheJours: 5,
@@ -51,7 +51,7 @@ const base = {
     { cle: 'horaires', valeur: HORAIRES_PAR_DEFAUT },
     { cle: 'cardiologues', valeur: CARDIOS },
     { cle: 'sauvegarde', valeur: { destinataires: ['secretariat@exemple.fr'], frequence: 'quotidien', joursConservation: 7 } },
-    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.0.0' } },
+    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.1.0' } },
   ],
 };
 
@@ -67,7 +67,7 @@ function remplirPlanningDeDemonstration() {
     [{ categorie: 'polygraphie', dureeHeures: 24 }],
     [{ categorie: 'spider', dureeHeures: 168 }],
   ];
-  const heures = ['08:30', '09:15', '10:00', '10:45', '11:30', '14:15', '15:00', '16:30'];
+  const heures = ['09:15', '10:00', '10:45', '11:30', '14:30', '15:15', '16:00', '16:45'];
 
   let graine = 7;
   const tirage = (max) => {
@@ -252,6 +252,33 @@ function chevauchement(a1, a2, b1, b2) {
   return a1 < b2 && b1 < a2;
 }
 
+/**
+ * Contrôles communs à la réservation et au déplacement, identiques à ceux
+ * de la vraie base : conflit d'appareil et charge des créneaux de POSE
+ * (les déposes accueillent un nombre illimité de patients).
+ */
+function verifierLignes(p_lignes, rdvIgnoreId = null) {
+  for (const ligne of p_lignes) {
+    const conflit = base.poses.some((p) => (
+      p.appareil_id === ligne.appareil_id && p.statut !== 'annule'
+      && p.rdv_id !== rdvIgnoreId
+      && chevauchement(ligne.debut, ligne.fin, p.debut, p.retour_effectif || p.fin)
+    ));
+    if (conflit) {
+      throw new Error('CONFLIT_APPAREIL: une autre secrétaire vient d’attribuer ce matériel.');
+    }
+  }
+  const max = base.parametres[0].valeur.posesParCreneau;
+  for (const creneau of new Set(p_lignes.map((l) => l.debut))) {
+    const patients = new Set(base.poses
+      .filter((p) => p.statut !== 'annule' && p.rdv_id !== rdvIgnoreId && p.debut === creneau)
+      .map((p) => p.rdv_id));
+    if (patients.size + 1 > max) {
+      throw new Error(`CRENEAU_COMPLET: le créneau de pose du ${creneau} est déjà pris par ${patients.size} patient(s) (maximum ${max}).`);
+    }
+  }
+}
+
 const fonctions = {
   reserver_rendez_vous({ p_rdv, p_lignes }) {
     // Contrôles identiques à ceux de la vraie base.
@@ -261,24 +288,7 @@ const fonctions = {
     if (!['F', 'M'].includes(p_rdv.patient_sexe)) {
       throw new Error('SEXE_MANQUANT: indiquez le sexe du patient (F ou M).');
     }
-    for (const ligne of p_lignes) {
-      const conflit = base.poses.some((p) => (
-        p.appareil_id === ligne.appareil_id && p.statut !== 'annule'
-        && chevauchement(ligne.debut, ligne.fin, p.debut, p.retour_effectif || p.fin)
-      ));
-      if (conflit) {
-        throw new Error('CONFLIT_APPAREIL: une autre secrétaire vient d’attribuer ce matériel.');
-      }
-    }
-    const max = base.parametres[0].valeur.gestesParCreneau;
-    for (const creneau of new Set(p_lignes.flatMap((l) => [l.debut, l.fin]))) {
-      const patients = new Set(base.poses
-        .filter((p) => p.statut !== 'annule' && (p.debut === creneau || p.fin === creneau))
-        .map((p) => p.rdv_id));
-      if (patients.size + 1 > max) {
-        throw new Error(`CRENEAU_COMPLET: le créneau du ${creneau} est déjà pris par ${patients.size} patient(s) (maximum ${max}).`);
-      }
-    }
+    verifierLignes(p_lignes);
 
     const rdv = {
       id: identifiant('rdv'), ...p_rdv, statut: 'prevu',
@@ -292,6 +302,28 @@ const fonctions = {
     }
     diffuser();
     return { id: rdv.id, appareils: p_lignes.length };
+  },
+
+  deplacer_rendez_vous({ p_rdv_id, p_rdv_cardio, p_lignes }) {
+    const rdv = base.rendez_vous.find((r) => r.id === p_rdv_id);
+    if (!rdv) throw new Error('RDV_INTROUVABLE: ce rendez-vous n’existe plus.');
+    if (rdv.statut === 'annule') throw new Error('RDV_ANNULE: un rendez-vous annulé ne peut pas être déplacé.');
+    if (base.poses.some((p) => p.rdv_id === p_rdv_id && ['pose', 'rendu'].includes(p.statut))) {
+      throw new Error('MATERIEL_DEJA_POSE: le matériel de ce rendez-vous est déjà posé.');
+    }
+    if (!p_lignes.length) throw new Error('AUCUN_MATERIEL: sélectionnez au moins un matériel à poser.');
+
+    verifierLignes(p_lignes, p_rdv_id);
+
+    rdv.rdv_cardio = p_rdv_cardio;
+    for (const p of base.poses) if (p.rdv_id === p_rdv_id && p.statut === 'prevu') p.statut = 'annule';
+    for (const ligne of p_lignes) {
+      base.poses.push({
+        id: identifiant('pose'), rdv_id: p_rdv_id, ...ligne, retour_effectif: null, statut: 'prevu',
+      });
+    }
+    diffuser();
+    return { id: p_rdv_id, appareils: p_lignes.length };
   },
 
   annuler_rendez_vous({ p_rdv_id, p_motif }) {

@@ -52,25 +52,30 @@ quart d'heure par quart d'heure, avec un code couleur par type d'appareil
 **Onglet Rendez-vous** — la secrétaire saisit le rendez-vous avec le cardiologue
 et le matériel souhaité. Le logiciel calcule tout le reste :
 
-- la **dépose** 20 minutes avant le rendez-vous cardiologue, pour que le résultat
+- la **dépose** 15 minutes avant le rendez-vous cardiologue, pour que le résultat
   soit disponible pendant la consultation ;
 - la **pose** la durée de port plus tôt (la veille pour 24 h, 7 jours avant pour
-  le Spider Flash), en tenant compte des week-ends et des jours fériés — la veille
-  d'un lundi est le samedi, dernière pose à 11h45 ;
+  le Spider Flash), en tenant compte des plages d'ouverture (matin et
+  après-midi), des week-ends et des jours fériés — la veille d'un lundi est le
+  samedi ;
+- pour la **polygraphie ventilatoire** : pose la veille en fin d'après-midi
+  (plage réservée, jusqu'à 17h15 en semaine, 16h45 le vendredi), dépose le
+  lendemain matin, après une seule nuit d'enregistrement ;
 - le **numéro d'appareil** à donner, en faisant tourner le parc de façon homogène ;
 - si le matériel demandé est indisponible, il le **dit clairement** et propose
   d'autres jours et d'autres heures ;
 - si aucun Holter ELA n'est libre, il **bascule automatiquement sur un DMS**
   (et inversement) en le signalant.
 
-**Onglet Recherche** — retrouver un patient et annuler son rendez-vous ;
-le matériel est aussitôt libéré.
+**Onglet Recherche** — retrouver un patient, **déplacer ou modifier** son
+rendez-vous (autre date, autre heure, autre matériel — changer le type de
+Holter par exemple) ou l'annuler ; le matériel est aussitôt libéré.
 
 **Onglet Calendrier** — une vue d'ensemble : le matériel en lignes, les jours en
 colonnes, un trait coloré sur chaque journée où l'appareil est chez un patient.
 
 **Onglet Réglages** — parc matériel (ajout, retrait avec réattribution
-automatique des patients concernés), horaires, nombre de patients par quart
+automatique des patients concernés), horaires, nombre de poses par quart
 d'heure, cardiologues, fermetures exceptionnelles, destinataires des e-mails,
 statistiques de l'année et comptes utilisateurs.
 

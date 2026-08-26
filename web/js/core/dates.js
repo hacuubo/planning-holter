@@ -223,41 +223,67 @@ export function estFerie(date, options = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * Horaires par défaut du cabinet.
- * `debut` et `fin` sont inclusifs : `fin` est l'heure du DERNIER créneau.
- * `null` = jour de fermeture.
+ * Horaires par défaut du cabinet, confirmés par le secrétariat.
+ * Chaque jour ouvert comporte une ou plusieurs PLAGES de rendez-vous
+ * (matin, après-midi) ; `debut` et `fin` sont inclusifs : `fin` est l'heure
+ * du DERNIER créneau de la plage. `null` = jour de fermeture.
+ *
+ * `finPosePolygraphie` prolonge la plage de l'après-midi UNIQUEMENT pour les
+ * poses de polygraphie ventilatoire (elles se posent en fin de journée et se
+ * déposent le lendemain matin, après une seule nuit d'enregistrement).
  */
 export const HORAIRES_PAR_DEFAUT = {
-  0: null,                            // dimanche
-  1: { debut: '08:00', fin: '18:00' }, // lundi (reprise à 8h)
-  2: { debut: '07:45', fin: '18:00' },
-  3: { debut: '07:45', fin: '18:00' },
-  4: { debut: '07:45', fin: '18:00' },
-  5: { debut: '07:45', fin: '18:00' },
-  6: { debut: '07:45', fin: '11:45' }, // samedi : dernier geste à 11h45
+  0: null, // dimanche
+  1: { plages: [{ debut: '08:45', fin: '11:30' }, { debut: '14:00', fin: '16:30' }], finPosePolygraphie: '17:15' },
+  2: { plages: [{ debut: '08:45', fin: '11:30' }, { debut: '14:00', fin: '16:30' }], finPosePolygraphie: '17:15' },
+  3: { plages: [{ debut: '08:45', fin: '11:30' }, { debut: '14:00', fin: '16:30' }], finPosePolygraphie: '17:15' },
+  4: { plages: [{ debut: '08:45', fin: '11:30' }, { debut: '14:00', fin: '16:30' }], finPosePolygraphie: '17:15' },
+  5: { plages: [{ debut: '08:45', fin: '11:30' }, { debut: '14:00', fin: '16:00' }], finPosePolygraphie: '16:45' },
+  6: { plages: [{ debut: '08:30', fin: '11:45' }] }, // samedi : matin seul, pas de pose de polygraphie
 };
 
 export const PAS_CRENEAU_MINUTES = 15;
+
+/**
+ * Accepte l'ancien format d'horaires `{ debut, fin }` (une seule plage
+ * continue, encore présent dans d'anciens réglages enregistrés) et le
+ * nouveau `{ plages: [...] }`. Renvoie toujours le nouveau format, ou null.
+ */
+export function normaliserHoraires(h) {
+  if (!h) return null;
+  if (Array.isArray(h.plages)) return h.plages.length ? h : null;
+  if (h.debut && h.fin) return { plages: [{ debut: h.debut, fin: h.fin }] };
+  return null;
+}
 
 /** Horaires applicables à une date, ou null si le cabinet est fermé. */
 export function horairesDuJour(date, parametres = {}) {
   if (estFerie(date, parametres)) return null;
   const horaires = parametres.horaires || HORAIRES_PAR_DEFAUT;
-  return horaires[jourSemaine(date)] || null;
+  return normaliserHoraires(horaires[jourSemaine(date)]);
 }
 
 export function estJourOuvre(date, parametres = {}) {
   return horairesDuJour(date, parametres) !== null;
 }
 
-/** Liste des créneaux ("HH:MM") d'une journée. Tableau vide si fermé. */
-export function creneauxDuJour(date, parametres = {}) {
+/** Plages d'ouverture d'une date : [{ debut, fin }]. Tableau vide si fermé. */
+export function plagesDuJour(date, parametres = {}) {
   const h = horairesDuJour(date, parametres);
-  if (!h) return [];
-  const pas = parametres.pasCreneauMinutes || PAS_CRENEAU_MINUTES;
+  return h ? h.plages : [];
+}
+
+/** Créneaux "HH:MM" espacés de `pas` minutes entre deux heures INCLUSES. */
+export function listeCreneaux(debut, fin, pas = PAS_CRENEAU_MINUTES) {
   const liste = [];
-  for (let m = minutes(h.debut); m <= minutes(h.fin); m += pas) liste.push(heure(m));
+  for (let m = minutes(debut); m <= minutes(fin); m += pas) liste.push(heure(m));
   return liste;
+}
+
+/** Liste des créneaux ("HH:MM") d'une journée, toutes plages confondues. */
+export function creneauxDuJour(date, parametres = {}) {
+  const pas = parametres.pasCreneauMinutes || PAS_CRENEAU_MINUTES;
+  return plagesDuJour(date, parametres).flatMap((p) => listeCreneaux(p.debut, p.fin, pas));
 }
 
 /** Vrai si `heureTexte` est un créneau valide de la journée `date`. */

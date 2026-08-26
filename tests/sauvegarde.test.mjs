@@ -84,7 +84,7 @@ function fauxSupabase(etat) {
       if (url.pathname === '/rest/v1/appareils') return json(APPAREILS);
       if (url.pathname === '/rest/v1/parametres') {
         return json([
-          { cle: 'planification', valeur: { gestesParCreneau: 2, minutesAvantRdvCardio: 20 } },
+          { cle: 'planification', valeur: { posesParCreneau: 1, minutesAvantRdvCardio: 15 } },
           { cle: 'horaires', valeur: HORAIRES_PAR_DEFAUT },
           { cle: 'sauvegarde', valeur: { destinataires: [], frequence: 'quotidien', joursConservation: 7 } },
         ]);

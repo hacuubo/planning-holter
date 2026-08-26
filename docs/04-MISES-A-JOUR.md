@@ -65,7 +65,7 @@ e-mails, délai entre la dépose et le rendez-vous. Regardez-y d'abord.
 
 1. Vous décrivez le besoin dans la discussion.
 2. Les fichiers concernés sont modifiés, et les **vérifications automatiques**
-   sont relancées (65 contrôles) pour s'assurer que rien d'existant n'est cassé.
+   sont relancées (plus de 70 contrôles) pour s'assurer que rien d'existant n'est cassé.
 3. Vous recevez la liste des fichiers modifiés.
 4. Vous les déposez sur GitHub (voir ci-dessous).
 5. Les secrétaires **rechargent la page** : elles ont la nouvelle version.
@@ -139,3 +139,14 @@ toujours quelle version tourne au cabinet.
 | Version | Date | Contenu |
 |---------|------|---------|
 | 1.0.0 | mise en service initiale | planning, prise de rendez-vous, recherche, calendrier, réglages, statistiques, sauvegardes quotidiennes |
+| 1.1.0 | août 2026 | déplacement / modification d'un rendez-vous depuis la Recherche ; plages de rendez-vous matin et après-midi ; règles de la polygraphie (pose la veille après-midi jusqu'à 17h15 — 16h45 le vendredi —, dépose le lendemain matin, une seule nuit) ; 1 pose par quart d'heure et déposes illimitées ; dépose 15 minutes avant le rendez-vous |
+
+**Mise à jour 1.1.0 — à faire une fois dans Supabase.** Cette version touche
+aussi la base (une nouvelle fonction et des règles de contrôle) : après avoir
+déposé les fichiers du site, ouvrez Supabase ▸ **SQL Editor**, collez le
+contenu de `supabase/03-fonctions.sql` et cliquez sur **Run** (les rendez-vous
+ne sont pas touchés : seules les fonctions sont remplacées). Vérifiez ensuite
+dans l'onglet **Réglages ▸ Horaires et capacité** que les plages, le nombre de
+poses par quart d'heure (1) et le délai de dépose (15 minutes) correspondent
+bien au fonctionnement du cabinet, puis cliquez sur **Enregistrer les
+horaires** : les anciens réglages enregistrés sont remplacés par les nouveaux.

@@ -125,7 +125,7 @@ export async function rechercherRendezVous(texte) {
     .select(`
       id, patient_nom, patient_sexe, cardiologue, rdv_cardio,
       telephone, commentaire, statut, motif_annulation, cree_par_nom, cree_le,
-      poses ( id, appareil_id, debut, fin, statut, duree_heures, retour_effectif )
+      poses ( id, appareil_id, debut, fin, statut, duree_heures, marque_demandee, retour_effectif )
     `)
     .ilike('patient_nom', motif)
     .order('rdv_cardio', { ascending: false })
@@ -159,6 +159,27 @@ export async function reserverRendezVous(rdv, lignes) {
       telephone: rdv.telephone || null,
       commentaire: rdv.commentaire || null,
     },
+    p_lignes: lignes.map((l) => ({
+      appareil_id: l.appareil_id,
+      duree_heures: l.duree_heures,
+      marque_demandee: l.marque_demandee || null,
+      debut: versSql(l.debut),
+      fin: versSql(l.fin),
+    })),
+  });
+  if (error) throw traduireErreur(error);
+  return data;
+}
+
+/**
+ * Déplace ou modifie un rendez-vous existant : nouvelle date/heure de
+ * rendez-vous cardiologue et nouvelle liste de matériels. Les anciennes
+ * poses prévues sont annulées et remplacées, en une seule opération.
+ */
+export async function deplacerRendezVous(id, rdvCardio, lignes) {
+  const { data, error } = await client.rpc('deplacer_rendez_vous', {
+    p_rdv_id: id,
+    p_rdv_cardio: versSql(rdvCardio),
     p_lignes: lignes.map((l) => ({
       appareil_id: l.appareil_id,
       duree_heures: l.duree_heures,
@@ -294,6 +315,10 @@ const TRADUCTIONS = [
   [/HORAIRE_INVALIDE/, 'L’horaire choisi ne correspond pas aux plages d’ouverture du cabinet.'],
   [/JOUR_FERME/, 'Le cabinet est fermé ce jour-là.'],
   [/APPAREIL_INACTIF/, 'Cet appareil ne fait plus partie du parc.'],
+  [/RDV_INTROUVABLE/, 'Ce rendez-vous n’existe plus. Actualisez la recherche.'],
+  [/RDV_ANNULE/, 'Ce rendez-vous a été annulé : il ne peut plus être déplacé.'],
+  [/MATERIEL_DEJA_POSE/, 'Le matériel de ce rendez-vous est déjà posé (ou rendu) : '
+    + 'le rendez-vous ne peut plus être déplacé.'],
   [/ACCES_REFUSE/, 'Votre compte n’est pas autorisé à effectuer cette action. '
     + 'Contactez votre administrateur.'],
   [/AUCUN_MATERIEL/, 'Sélectionnez au moins un matériel à poser.'],

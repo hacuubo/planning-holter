@@ -7,7 +7,7 @@
  *
  * Principe général d'un examen :
  *   1. le patient a un rendez-vous avec son cardiologue le jour J à l'heure H ;
- *   2. le matériel est DÉPOSÉ (retiré) 20 minutes avant ce rendez-vous, pour
+ *   2. le matériel est DÉPOSÉ (retiré) 15 minutes avant ce rendez-vous, pour
  *      que le résultat soit disponible pendant la consultation ;
  *   3. le matériel a donc été POSÉ « durée de port » plus tôt, en remontant
  *      aux jours ouvrés (la veille d'un lundi est le samedi) ;
@@ -17,15 +17,19 @@
 
 import {
   ajouterJours, creneauxDuJour, decaler, ecartJours, estJourOuvre,
-  horodatage, horodatageEnMinutes, decouper, normaliserHorodatage,
+  horairesDuJour, horodatage, horodatageEnMinutes, decouper, listeCreneaux,
+  minutes, normaliserHorodatage, PAS_CRENEAU_MINUTES,
 } from './dates.js';
+
+/** Minuit + 12 h : sépare les plages du matin de celles de l'après-midi. */
+const MIDI_MINUTES = 12 * 60;
 
 /** Paramètres de fonctionnement par défaut (modifiables dans l'onglet Paramètres). */
 export const PARAMETRES_PAR_DEFAUT = {
   /** Délai entre la dépose du matériel et le rendez-vous cardiologue. */
-  minutesAvantRdvCardio: 20,
-  /** Nombre de patients pris en charge par créneau de 15 minutes. */
-  gestesParCreneau: 2,
+  minutesAvantRdvCardio: 15,
+  /** Nombre de POSES par créneau de 15 minutes (les déposes sont illimitées). */
+  posesParCreneau: 1,
   /** Tolérance : port légèrement plus court que la durée nominale (minutes). */
   toleranceDureeMinutes: 60,
   /** Délai de remise en service après le retour d'un appareil (minutes). */
@@ -40,6 +44,33 @@ export const PARAMETRES_PAR_DEFAUT = {
 
 export function fusionnerParametres(parametres = {}) {
   return { ...PARAMETRES_PAR_DEFAUT, ...parametres };
+}
+
+// ---------------------------------------------------------------------------
+// 0. Créneaux de pose selon la catégorie de matériel
+// ---------------------------------------------------------------------------
+
+/**
+ * Créneaux ("HH:MM") où une POSE de la catégorie donnée est possible ce
+ * jour-là. Pour tout le matériel courant : tous les créneaux d'ouverture.
+ * Pour la polygraphie ventilatoire : uniquement l'après-midi, prolongé
+ * jusqu'à `finPosePolygraphie` (plage réservée aux polygraphies).
+ */
+export function creneauxPoseDuJour(date, categorie, parametres = {}) {
+  if (categorie !== 'polygraphie') return creneauxDuJour(date, parametres);
+
+  const h = horairesDuJour(date, parametres);
+  if (!h) return [];
+  const pas = parametres.pasCreneauMinutes || PAS_CRENEAU_MINUTES;
+  const apresMidi = h.plages.filter((p) => minutes(p.debut) >= MIDI_MINUTES);
+  return apresMidi.flatMap((p, i) => {
+    const derniere = i === apresMidi.length - 1;
+    const fin = derniere && h.finPosePolygraphie
+      && minutes(h.finPosePolygraphie) > minutes(p.fin)
+      ? h.finPosePolygraphie
+      : p.fin;
+    return listeCreneaux(p.debut, fin, pas);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -113,10 +144,16 @@ export function poseIdeale(deposeTs, dureeHeures) {
  *   - la durée de port réelle est au moins « durée nominale − tolérance » ;
  *   - il est postérieur (ou égal) à `pasAvant` (par défaut : maintenant).
  *
+ * Cas particulier de la polygraphie ventilatoire (`categorie` = 'polygraphie') :
+ * elle s'enregistre pendant UNE SEULE NUIT. La pose a lieu la veille
+ * calendaire de la dépose, l'après-midi uniquement (plage prolongée), sans
+ * contrainte de durée nominale.
+ *
  * @returns {Array<{horodatage: string, dureeReelleMinutes: number, ecartMinutes: number}>}
  */
-export function creneauxPoseCandidats(deposeTs, dureeHeures, parametres = {}, pasAvant = null) {
+export function creneauxPoseCandidats(deposeTs, dureeHeures, parametres = {}, pasAvant = null, categorie = null) {
   const p = fusionnerParametres(parametres);
+  if (categorie === 'polygraphie') return creneauxPosePolygraphie(deposeTs, p, pasAvant);
   const ideal = poseIdeale(deposeTs, dureeHeures);
   const minutesIdeal = horodatageEnMinutes(ideal);
   const minutesDepose = horodatageEnMinutes(deposeTs);
@@ -154,6 +191,31 @@ export function creneauxPoseCandidats(deposeTs, dureeHeures, parametres = {}, pa
     return a.ecartMinutes - b.ecartMinutes;
   });
   return candidats;
+}
+
+/**
+ * Créneaux de pose d'une polygraphie : la VEILLE calendaire de la dépose
+ * (une seule nuit d'enregistrement), l'après-midi uniquement — la plage se
+ * prolonge jusqu'à `finPosePolygraphie` (17:15 en semaine, 16:45 le
+ * vendredi). Les créneaux les plus tardifs sont proposés en premier : ils
+ * sont réservés aux polygraphies et n'entrent pas en concurrence avec les
+ * poses des autres matériels.
+ */
+function creneauxPosePolygraphie(deposeTs, p, pasAvant = null) {
+  const veille = ajouterJours(decouper(deposeTs).date, -1);
+  if (!estJourOuvre(veille, p)) return []; // dimanche, férié : pas de pose la veille -> impossible
+  const minutesDepose = horodatageEnMinutes(deposeTs);
+  const minutesPlancher = pasAvant ? horodatageEnMinutes(pasAvant) : -Infinity;
+
+  return creneauxPoseDuJour(veille, 'polygraphie', p)
+    .map((h) => horodatage(veille, h))
+    .filter((ts) => horodatageEnMinutes(ts) >= minutesPlancher)
+    .map((ts) => ({
+      horodatage: ts,
+      dureeReelleMinutes: minutesDepose - horodatageEnMinutes(ts),
+      ecartMinutes: horodatageEnMinutes(ts) - (minutesDepose - 24 * 60),
+    }))
+    .sort((a, b) => b.horodatage.localeCompare(a.horodatage));
 }
 
 // ---------------------------------------------------------------------------
@@ -249,14 +311,15 @@ export function choisirAppareil(appareilsDisponibles, poses, debutTs) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Charge des créneaux (nombre de gestes par quart d'heure)
+// 4. Charge des créneaux (nombre de poses par quart d'heure)
 // ---------------------------------------------------------------------------
 
 /**
- * Nombre de gestes (poses + déposes) programmés sur chaque créneau.
+ * Nombre de POSES programmées sur chaque créneau. Les déposes ne sont pas
+ * comptées : elles peuvent accueillir un nombre illimité de patients.
  * Un patient qui reçoit plusieurs appareils au même moment ne compte que
- * pour un seul geste.
- * @returns {Map<string, number>} horodatage -> nombre de gestes
+ * pour une seule pose.
+ * @returns {Map<string, number>} horodatage -> nombre de poses
  */
 export function chargeDesCreneaux(poses, rdvIgnoreId = null) {
   const actes = new Set();
@@ -266,8 +329,7 @@ export function chargeDesCreneaux(poses, rdvIgnoreId = null) {
     // Les horodatages servent ici de clés : ils DOIVENT être normalisés, sinon
     // « 11:45 » et « 11:45:00 » comptent comme deux créneaux différents et le
     // contrôle de charge ne détecte plus rien.
-    actes.add(`${normaliserHorodatage(pose.debut)}|pose|${pose.rdv_id}`);
-    actes.add(`${normaliserHorodatage(pose.fin)}|depose|${pose.rdv_id}`);
+    actes.add(`${normaliserHorodatage(pose.debut)}|${pose.rdv_id}`);
   }
   const charge = new Map();
   for (const acte of actes) {
@@ -277,21 +339,21 @@ export function chargeDesCreneaux(poses, rdvIgnoreId = null) {
   return charge;
 }
 
-/** Nombre de gestes déjà programmés sur un créneau. */
+/** Nombre de poses déjà programmées sur un créneau. */
 export function gestesSurCreneau(charge, ts) {
   return charge.get(normaliserHorodatage(ts)) || 0;
 }
 
-/** Vrai si le créneau a atteint le nombre maximal de gestes. */
+/** Vrai si le créneau a atteint le nombre maximal de poses. */
 export function creneauSature(charge, ts, parametres = {}) {
   const p = fusionnerParametres(parametres);
-  return gestesSurCreneau(charge, ts) >= p.gestesParCreneau;
+  return gestesSurCreneau(charge, ts) >= p.posesParCreneau;
 }
 
-/** Places restantes sur un créneau. */
+/** Places de pose restantes sur un créneau. */
 export function placesRestantes(charge, ts, parametres = {}) {
   const p = fusionnerParametres(parametres);
-  return Math.max(0, p.gestesParCreneau - gestesSurCreneau(charge, ts));
+  return Math.max(0, p.posesParCreneau - gestesSurCreneau(charge, ts));
 }
 
 // ---------------------------------------------------------------------------
@@ -332,30 +394,40 @@ export function planifier({
     return { possible: false, depose: null, avertissements, lignes: [] };
   }
 
+  // Le nombre de déposes par créneau n'est pas limité : seul le créneau de
+  // POSE est soumis au contrôle de charge (voir plus bas).
   const charge = chargeDesCreneaux(posesUtiles, rdvIgnoreId);
 
-  // Le créneau de dépose doit lui aussi disposer d'une place.
-  if (creneauSature(charge, depose.horodatage, p)) {
-    avertissements.push(
-      `Le créneau de dépose ${decouper(depose.horodatage).heure} est complet `
-      + `(${p.gestesParCreneau} patients maximum par quart d'heure).`,
-    );
-    return { possible: false, depose: depose.horodatage, avertissements, lignes: [] };
-  }
-
   // Les matériels de même durée de port sont posés au même moment.
+  // La polygraphie forme toujours son propre groupe : ses créneaux de pose
+  // (la veille, l'après-midi) ne sont pas ceux des autres matériels.
   const groupes = new Map();
   for (const m of materiels) {
     const duree = m.dureeHeures || 24;
-    if (!groupes.has(duree)) groupes.set(duree, []);
-    groupes.get(duree).push({ ...m, dureeHeures: duree });
+    const cle = m.categorie === 'polygraphie' ? `polygraphie|${duree}` : `standard|${duree}`;
+    if (!groupes.has(cle)) groupes.set(cle, { duree, polygraphie: m.categorie === 'polygraphie', materiels: [] });
+    groupes.get(cle).materiels.push({ ...m, dureeHeures: duree });
   }
 
   const lignes = [];
   const reservations = []; // poses provisoires du rendez-vous en cours de construction
 
-  for (const [duree, groupe] of groupes) {
-    const candidats = creneauxPoseCandidats(depose.horodatage, duree, p, maintenant);
+  for (const [, { duree, polygraphie, materiels: groupe }] of groupes) {
+    // La polygraphie se dépose le matin : le résultat de la nuit est lu avant
+    // midi. Un rendez-vous cardiologue l'après-midi est donc refusé.
+    let motifImpose = null;
+    if (polygraphie && horodatageEnMinutes(depose.horodatage) % 1440 >= MIDI_MINUTES) {
+      motifImpose = 'La polygraphie se dépose le matin (avant midi) : '
+        + 'choisissez un rendez-vous cardiologue en matinée.';
+    }
+
+    const candidats = motifImpose ? [] : creneauxPoseCandidats(
+      depose.horodatage, duree, p, maintenant, polygraphie ? 'polygraphie' : null,
+    );
+    if (!motifImpose && polygraphie && candidats.length === 0) {
+      motifImpose = 'Aucun créneau de pose de polygraphie la veille : elle se pose '
+        + 'l’après-midi précédant le rendez-vous, pour une seule nuit d’enregistrement.';
+    }
     let creneauRetenu = null;
     let attributions = null;
 
@@ -403,9 +475,9 @@ export function planifier({
         });
       }
     } else {
-      const motif = attributions && attributions.motif
-        ? attributions.motif
-        : 'Aucun créneau de pose compatible n’est disponible avant ce rendez-vous.';
+      const motif = motifImpose
+        || (attributions && attributions.motif ? attributions.motif : null)
+        || 'Aucun créneau de pose compatible n’est disponible avant ce rendez-vous.';
       for (const m of groupe) {
         lignes.push({
           demande: m,
