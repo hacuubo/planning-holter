@@ -9,7 +9,7 @@
 import {
   ajouterJours, aujourdHui, dateEnFrancais, dateEnFrancaisLong, decouper,
   ecartJours, estFerie, estJourOuvre, jourSemaine, maintenantHorodatage,
-  nomJourFerie,
+  minutes, nomJourFerie,
 } from '../core/dates.js';
 import {
   CATEGORIES, dureeLisible, dureeParDefaut, dureesAutorisees, libelleAppareil,
@@ -247,6 +247,19 @@ function tableauCalendrier() {
   );
 }
 
+/**
+ * Position horizontale (en %) d'une heure dans la colonne d'un jour : la
+ * journée affichée court de 08:00 (bord gauche) à 18:00 (bord droit). Une
+ * pose de 08:45 démarre donc tout à gauche de sa colonne, une dépose de
+ * fin d'après-midi glisse presque jusqu'au bord droit de la sienne.
+ */
+const DEBUT_JOURNEE_MIN = 8 * 60;
+const FIN_JOURNEE_MIN = 18 * 60;
+function positionHeure(heure) {
+  const part = (minutes(heure) - DEBUT_JOURNEE_MIN) / (FIN_JOURNEE_MIN - DEBUT_JOURNEE_MIN);
+  return Math.min(100, Math.max(0, part * 100));
+}
+
 function traitDePose(pose, jour, appareil) {
   const p = decouper(pose.debut);
   const d = decouper(pose.fin);
@@ -255,11 +268,21 @@ function traitDePose(pose, jour, appareil) {
   // Le trait couvre trois jours pour un examen de 24 h : la veille de la
   // pose (appareil réservé, affichée en plus clair), le jour de pose au
   // milieu (où s'inscrivent l'heure de pose et le nom du patient) et le
-  // jour de dépose, avec son heure.
+  // jour de dépose, avec son heure. Dans la colonne du jour de pose, le
+  // trait DÉMARRE à la position de l'heure de pose ; dans celle du jour de
+  // dépose, il S'ARRÊTE à la position de l'heure de dépose.
   const veille = ajouterJours(debut, -1);
   const classes = ['trait', classeMateriel(appareil)];
+  const styles = [];
   if (jour === veille) classes.push('veille', 'debut');
-  if (jour === fin) classes.push('fin');
+  if (jour === debut) {
+    classes.push('debut');
+    styles.push(`left:${positionHeure(p.heure).toFixed(1)}%`);
+  }
+  if (jour === fin) {
+    classes.push('fin');
+    styles.push(`right:${(100 - positionHeure(d.heure)).toFixed(1)}%`);
+  }
 
   const patient = nomPatient(pose.rdv);
   // En vue large les cases sont trop étroites pour les heures : elles ne
@@ -279,6 +302,7 @@ function traitDePose(pose, jour, appareil) {
     'div',
     {
       class: classes.join(' '),
+      style: styles.length ? styles.join(';') : null,
       title: `${patient} · ${libelleAppareil(appareil)} · `
         + `pose le ${dateEnFrancais(debut)} à ${p.heure}, dépose le ${dateEnFrancais(fin)} à ${d.heure} `
         + `(appareil réservé dès le ${dateEnFrancais(veille)})`,

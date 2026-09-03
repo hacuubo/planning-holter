@@ -145,7 +145,10 @@ Les boutons du haut font défiler la période ; la liste déroulante propose
 deux vues : **30 jours** (vue d'ensemble) et **3 jours** (vue rapprochée,
 navigation par pas de 3 jours). En vue **3 jours**, chaque trait
 affiche l'**heure de pose à gauche**, le **nom du patient** au milieu et
-l'**heure de dépose à droite**.
+l'**heure de dépose à droite**. Dans les deux vues, le trait **démarre et
+s'arrête à la position de l'heure** dans la colonne du jour (8 h au bord
+gauche, 18 h au bord droit) : on lit d'un coup d'œil si la pose est en début
+ou en fin de journée.
 
 **Filtrer par type** — cliquez sur un type dans la légende (Holter DMS,
 Holter ELA, MAPA…) pour le masquer et alléger le tableau ; un second clic
