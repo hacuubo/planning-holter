@@ -242,24 +242,28 @@ end $$;
 -- =============================================================================
 --  DÉPLACEMENT / MODIFICATION D'UN RENDEZ-VOUS (opération unique et indivisible)
 -- =============================================================================
---  Nouvelle date/heure de rendez-vous cardiologue et nouvelle liste de
---  matériels (changer le type de Holter, par exemple). Les anciennes poses
---  prévues sont annulées et remplacées d'un seul tenant : soit tout le
---  déplacement réussit, soit rien ne change.
+--  Nouvelle date/heure de rendez-vous cardiologue, nouvelle liste de
+--  matériels à poser (changer le type de Holter, par exemple) et, si du
+--  matériel est DÉJÀ posé sur le patient, nouvelle heure de dépose
+--  (`p_nouvelle_depose`) : l'appareil et sa pose ne bougent pas, seule la
+--  dépose suit le rendez-vous. Les poses encore prévues sont annulées et
+--  remplacées d'un seul tenant : soit tout le déplacement réussit, soit
+--  rien ne change. Le matériel déjà rendu est conservé tel quel.
 -- =============================================================================
-create or replace function public.deplacer_rendez_vous(p_rdv_id uuid, p_rdv_cardio timestamp, p_lignes jsonb)
+drop function if exists public.deplacer_rendez_vous(uuid, timestamp, jsonb);
+create or replace function public.deplacer_rendez_vous(
+  p_rdv_id uuid, p_rdv_cardio timestamp, p_lignes jsonb,
+  p_nouvelle_depose timestamp default null
+)
 returns jsonb language plpgsql security invoker set search_path = public as $$
 declare
   v_rdv    public.rendez_vous%rowtype;
   v_ligne  jsonb;
   v_nb     integer := 0;
+  v_poses  integer;
 begin
   if not public.est_actif() then
     raise exception 'ACCES_REFUSE: votre compte n''est pas autorisé à modifier des rendez-vous.';
-  end if;
-
-  if jsonb_array_length(p_lignes) = 0 then
-    raise exception 'AUCUN_MATERIEL: sélectionnez au moins un matériel à poser.';
   end if;
 
   select * into v_rdv from public.rendez_vous where id = p_rdv_id for update;
@@ -270,17 +274,30 @@ begin
     raise exception 'RDV_ANNULE: un rendez-vous annulé ne peut pas être déplacé.';
   end if;
 
-  -- Du matériel déjà posé (ou rendu) ne peut plus être déplacé.
-  if exists (
-    select 1 from public.poses
-    where rdv_id = p_rdv_id and statut in ('pose', 'rendu')
-  ) then
-    raise exception 'MATERIEL_DEJA_POSE: le matériel de ce rendez-vous est déjà posé.';
+  -- Le rendez-vous doit garder au moins un matériel (posé, rendu ou à poser).
+  select count(*) into v_poses from public.poses
+  where rdv_id = p_rdv_id and statut in ('pose', 'rendu');
+  if v_poses = 0 and jsonb_array_length(p_lignes) = 0 then
+    raise exception 'AUCUN_MATERIEL: sélectionnez au moins un matériel à poser.';
   end if;
 
   update public.rendez_vous set rdv_cardio = p_rdv_cardio where id = p_rdv_id;
 
-  -- Les anciennes poses prévues sont annulées, puis remplacées.
+  -- Matériel déjà posé sur le patient : l'appareil et la pose ne changent
+  -- pas, la dépose est déplacée avec le rendez-vous.
+  if p_nouvelle_depose is not null then
+    if exists (
+      select 1 from public.poses
+      where rdv_id = p_rdv_id and statut = 'pose' and debut >= p_nouvelle_depose
+    ) then
+      raise exception 'DEPOSE_TROP_TOT: la nouvelle dépose précéderait la pose du matériel.'
+        using errcode = 'check_violation';
+    end if;
+    update public.poses set fin = p_nouvelle_depose
+    where rdv_id = p_rdv_id and statut = 'pose';
+  end if;
+
+  -- Les poses encore prévues sont annulées, puis remplacées.
   update public.poses set statut = 'annule'
   where rdv_id = p_rdv_id and statut = 'prevu';
 
@@ -302,6 +319,7 @@ begin
       'patient', v_rdv.patient_nom,
       'ancien_rdv', v_rdv.rdv_cardio,
       'nouveau_rdv', p_rdv_cardio,
+      'nouvelle_depose', p_nouvelle_depose,
       'appareils', v_nb));
 
   return jsonb_build_object('id', p_rdv_id, 'appareils', v_nb);
@@ -486,7 +504,7 @@ $$;
 -- =============================================================================
 grant execute on function
   public.reserver_rendez_vous(jsonb, jsonb),
-  public.deplacer_rendez_vous(uuid, timestamp, jsonb),
+  public.deplacer_rendez_vous(uuid, timestamp, jsonb, timestamp),
   public.annuler_rendez_vous(uuid, text),
   public.enregistrer_retour(uuid, timestamp),
   public.enregistrer_pose(uuid),

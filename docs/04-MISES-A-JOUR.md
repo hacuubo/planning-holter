@@ -139,6 +139,7 @@ toujours quelle version tourne au cabinet.
 | Version | Date | Contenu |
 |---------|------|---------|
 | 1.0.0 | mise en service initiale | planning, prise de rendez-vous, recherche, calendrier, réglages, statistiques, sauvegardes quotidiennes |
+| 1.2.0 | septembre 2026 | déplacement possible même quand le matériel est posé ou rendu (la dépose suit le rendez-vous, l'appareil ne change pas) ; calendrier : le trait couvre aussi la veille de la pose (trois jours pour un Holter 24 h, jour de pose au milieu) — rejouer `supabase/03-fonctions.sql` dans Supabase après la mise à jour |
 | 1.1.0 | août 2026 | déplacement / modification d'un rendez-vous depuis la Recherche ; plages de rendez-vous matin et après-midi ; règles de la polygraphie (pose la veille après-midi jusqu'à 17h15 — 16h45 le vendredi —, dépose le lendemain matin, une seule nuit) ; 1 pose par quart d'heure et déposes illimitées ; dépose 15 minutes avant le rendez-vous |
 
 **Mise à jour 1.1.0 — à faire une fois dans Supabase.** Cette version touche

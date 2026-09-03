@@ -82,10 +82,12 @@ function tableauCalendrier() {
   const dernier = jours[jours.length - 1];
   const today = aujourdHui();
 
-  // Poses concernées par la fenêtre affichée.
+  // Poses concernées par la fenêtre affichée. Le trait démarre la VEILLE de
+  // la pose (jour de réservation de l'appareil) : on garde donc aussi les
+  // poses dont seule la veille tombe dans la fenêtre.
   const poses = etat.poses.filter((p) => (
     p.statut !== 'annule'
-    && ecartJours(decouper(p.debut).date, dernier) >= 0
+    && ecartJours(ajouterJours(decouper(p.debut).date, -1), dernier) >= 0
     && ecartJours(debutFenetre, decouper(p.fin).date) >= 0
   ));
 
@@ -133,10 +135,13 @@ function tableauCalendrier() {
       if (jour === today) classes.push('aujourdhui');
 
       const td = el('td', { class: classes.join(' ') });
+      // La période réelle (pose -> dépose) passe avant la veille : quand deux
+      // examens s'enchaînent, la dépose de l'un ne doit pas être masquée par
+      // la veille du suivant.
       const pose = posesAppareil.find((p) => (
         ecartJours(decouper(p.debut).date, jour) >= 0
         && ecartJours(jour, decouper(p.fin).date) >= 0
-      ));
+      )) || posesAppareil.find((p) => ajouterJours(decouper(p.debut).date, -1) === jour);
       if (pose) td.append(traitDePose(pose, jour, appareil));
       return td;
     });
@@ -166,8 +171,12 @@ function tableauCalendrier() {
 function traitDePose(pose, jour, appareil) {
   const debut = decouper(pose.debut).date;
   const fin = decouper(pose.fin).date;
+  // Le trait couvre trois jours pour un examen de 24 h : la veille de la
+  // pose (appareil réservé, affichée en plus clair), le jour de pose au
+  // milieu (où s'inscrit le nom du patient) et le jour de dépose.
+  const veille = ajouterJours(debut, -1);
   const classes = ['trait', classeMateriel(appareil)];
-  if (jour === debut) classes.push('debut');
+  if (jour === veille) classes.push('veille', 'debut');
   if (jour === fin) classes.push('fin');
 
   const patient = nomPatient(pose.rdv);
@@ -176,7 +185,8 @@ function traitDePose(pose, jour, appareil) {
     {
       class: classes.join(' '),
       title: `${patient} · ${libelleAppareil(appareil)} · `
-        + `du ${dateEnFrancais(debut)} au ${dateEnFrancais(fin)}`,
+        + `pose le ${dateEnFrancais(debut)}, dépose le ${dateEnFrancais(fin)} `
+        + `(appareil réservé dès le ${dateEnFrancais(veille)})`,
       onclick: () => detailPose(pose, appareil),
     },
     jour === debut ? patient.slice(0, 9) : '',

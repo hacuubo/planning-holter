@@ -115,8 +115,14 @@ actuel : changez la date, l'heure ou le matériel (le type de Holter, par
 exemple) et le logiciel recalcule aussitôt la pose, la dépose et les appareils,
 comme lors d'une prise de rendez-vous. L'ancien créneau est libéré
 automatiquement à l'enregistrement. Si le nouveau créneau est impossible,
-d'autres rendez-vous sont proposés. Un rendez-vous dont le matériel est déjà
-posé ne peut plus être déplacé : annulez-le puis reprenez un rendez-vous.
+d'autres rendez-vous sont proposés.
+
+Le déplacement reste possible **même une fois le matériel posé ou rendu**, y
+compris pour un rendez-vous passé : l'appareil et sa date de pose ne bougent
+alors plus, seule la **dépose suit le nouveau rendez-vous** (matériel posé) ;
+un matériel déjà rendu reste inchangé et seule la date du rendez-vous
+cardiologue est modifiée. Le logiciel vérifie que l'appareil n'est pas promis
+à un autre patient sur la période prolongée.
 
 **Annuler le rendez-vous** libère immédiatement le matériel pour d'autres
 patients. Le rendez-vous n'est pas effacé : il reste consultable, marqué
@@ -128,7 +134,11 @@ patients. Le rendez-vous n'est pas effacé : il reste consultable, marqué
 
 Le matériel en lignes, les jours en colonnes. Chaque trait coloré est un examen
 en cours : on voit d'un coup d'œil les périodes chargées et les appareils libres.
-Cliquez sur un trait pour voir le patient concerné.
+Pour un Holter 24 h, le trait court sur **trois jours** : la **veille de la
+pose** (en plus clair — l'appareil est réservé), le **jour de pose** au milieu,
+où s'inscrit le nom du patient, et le **jour de dépose**. Les examens plus
+longs (48 h, 72 h, Spider Flash) s'étendent d'autant. Cliquez sur un trait pour
+voir le patient concerné.
 
 Les boutons du haut font défiler mois par mois ; la liste déroulante permet
 d'afficher 30 à 120 jours d'un coup.

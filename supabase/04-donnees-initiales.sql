@@ -134,7 +134,7 @@ insert into public.parametres (cle, valeur) values
    )),
   ('cabinet', jsonb_build_object(
      'nom', 'Cabinet de cardiologie',
-     'version', '1.1.0'
+     'version', '1.2.0'
    ))
 on conflict (cle) do nothing;
 

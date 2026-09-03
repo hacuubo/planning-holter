@@ -350,6 +350,9 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .calendrier .trait.debut { left: 3px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
 .calendrier .trait.fin { right: 3px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+/* Veille de la pose : l'appareil est réservé, en plus clair pour la distinguer
+   des jours où il est réellement chez le patient. */
+.calendrier .trait.veille { opacity: .4; }
 .calendrier .trait.holter_ecg-DMS { background: var(--holter-dms); }
 .calendrier .trait.holter_ecg-ELA { background: var(--holter-ela); }
 .calendrier .trait.mapa { background: var(--mapa); }

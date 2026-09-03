@@ -173,10 +173,12 @@ export async function reserverRendezVous(rdv, lignes) {
 
 /**
  * Déplace ou modifie un rendez-vous existant : nouvelle date/heure de
- * rendez-vous cardiologue et nouvelle liste de matériels. Les anciennes
- * poses prévues sont annulées et remplacées, en une seule opération.
+ * rendez-vous cardiologue et nouvelle liste de matériels à poser. Les
+ * anciennes poses prévues sont annulées et remplacées, en une seule
+ * opération. Si du matériel est déjà posé sur le patient, `nouvelleDepose`
+ * déplace sa dépose sans toucher à l'appareil ni à la pose.
  */
-export async function deplacerRendezVous(id, rdvCardio, lignes) {
+export async function deplacerRendezVous(id, rdvCardio, lignes, nouvelleDepose = null) {
   const { data, error } = await client.rpc('deplacer_rendez_vous', {
     p_rdv_id: id,
     p_rdv_cardio: versSql(rdvCardio),
@@ -187,6 +189,7 @@ export async function deplacerRendezVous(id, rdvCardio, lignes) {
       debut: versSql(l.debut),
       fin: versSql(l.fin),
     })),
+    p_nouvelle_depose: nouvelleDepose ? versSql(nouvelleDepose) : null,
   });
   if (error) throw traduireErreur(error);
   return data;
@@ -319,6 +322,8 @@ const TRADUCTIONS = [
   [/RDV_ANNULE/, 'Ce rendez-vous a été annulé : il ne peut plus être déplacé.'],
   [/MATERIEL_DEJA_POSE/, 'Le matériel de ce rendez-vous est déjà posé (ou rendu) : '
     + 'le rendez-vous ne peut plus être déplacé.'],
+  [/DEPOSE_TROP_TOT/, 'La nouvelle dépose précéderait la pose du matériel : '
+    + 'choisissez un rendez-vous plus tardif.'],
   [/ACCES_REFUSE/, 'Votre compte n’est pas autorisé à effectuer cette action. '
     + 'Contactez votre administrateur.'],
   [/AUCUN_MATERIEL/, 'Sélectionnez au moins un matériel à poser.'],
