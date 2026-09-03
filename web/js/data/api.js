@@ -213,6 +213,53 @@ export async function enregistrerRetour(poseId, horodatage = null) {
   if (error) throw traduireErreur(error);
 }
 
+/**
+ * Applique plusieurs changements d'appareil d'un seul tenant (correction du
+ * jour de la pose : les patients réattribués d'abord, la correction ensuite).
+ * @param {Array<{pose_id: string, appareil_id: string}>} changements
+ */
+export async function changerAppareils(changements) {
+  const { error } = await client.rpc('changer_appareils', { p_changements: changements });
+  if (error) throw traduireErreur(error);
+}
+
+/** Réattribue une pose : autre appareil et, si besoin, autre créneau de pose. */
+export async function reattribuerPose(poseId, appareilId, debut) {
+  const { error } = await client.rpc('reattribuer_pose', {
+    p_pose_id: poseId, p_appareil_id: appareilId, p_debut: versSql(debut),
+  });
+  if (error) throw traduireErreur(error);
+}
+
+// ---------------------------------------------------------------------------
+// Rappels téléphoniques (patients à prévenir d'un changement d'horaire)
+// ---------------------------------------------------------------------------
+
+export async function listerRappels() {
+  const { data, error } = await client
+    .from('rappels')
+    .select('*')
+    .order('cree_le', { ascending: false })
+    .limit(200);
+  if (error) throw traduireErreur(error);
+  return data;
+}
+
+export async function ajouterRappel(rappel) {
+  const { error } = await client.from('rappels').insert({
+    rdv_id: rappel.rdv_id || null,
+    patient_nom: rappel.patient_nom,
+    telephone: rappel.telephone || null,
+    message: rappel.message,
+  });
+  if (error) throw traduireErreur(error);
+}
+
+export async function marquerRappel(id, fait, faitPar = null) {
+  const { error } = await client.from('rappels').update({ fait, fait_par: fait ? faitPar : null }).eq('id', id);
+  if (error) throw traduireErreur(error);
+}
+
 export async function changerAppareil(poseId, appareilId) {
   const { error } = await client.rpc('changer_appareil', {
     p_pose_id: poseId, p_appareil_id: appareilId,
@@ -291,6 +338,7 @@ export function ecouterModifications(surChangement, surEtat) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rendez_vous' }, surChangement)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'appareils' }, surChangement)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'parametres' }, surChangement)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'rappels' }, surChangement)
     .subscribe((statut) => {
       if (surEtat) surEtat(statut === 'SUBSCRIBED');
     });

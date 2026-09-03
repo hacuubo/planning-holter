@@ -267,6 +267,7 @@ export function appareilsLibres(appareils, poses, criteres, parametres = {}) {
   const { categorie, marque = null, debut, fin, inclureUrgence = false, poseIgnoreeId = null } = criteres;
   return appareils.filter((a) => (
     a.actif !== false
+    && a.hors_service !== true
     && a.categorie === categorie
     && (!marque || marque === 'indifferent' || a.marque === marque)
     && (inclureUrgence || !a.urgence)
@@ -618,7 +619,7 @@ export function propositionsAlternatives({
 export function disponibilitesParType(appareils, poses, debut, fin, parametres = {}) {
   const types = new Map();
   for (const a of appareils) {
-    if (a.actif === false || a.urgence) continue;
+    if (a.actif === false || a.hors_service === true || a.urgence) continue;
     const cle = a.marque ? `${a.categorie}|${a.marque}` : a.categorie;
     if (!types.has(cle)) {
       types.set(cle, { cle, categorie: a.categorie, marque: a.marque, total: 0, libres: 0, codesLibres: [] });
@@ -631,4 +632,147 @@ export function disponibilitesParType(appareils, poses, debut, fin, parametres =
     }
   }
   return [...types.values()];
+}
+
+// ---------------------------------------------------------------------------
+// 8. Corrections et réattributions d'appareils
+// ---------------------------------------------------------------------------
+
+/** Vrai si l'appareil ne doit plus recevoir de nouvelle attribution. */
+export function appareilIndisponible(appareil) {
+  return !appareil || appareil.actif === false || appareil.hors_service === true;
+}
+
+/**
+ * Correction du jour de la pose : le mauvais appareil a été posé sur un
+ * patient, on veut enregistrer l'appareil réellement posé (`appareilCible`).
+ * Si celui-ci était réservé pour d'autres patients, la fonction cherche un
+ * appareil de remplacement pour chacun d'eux (l'appareil d'origine, redevenu
+ * libre, en fait partie).
+ *
+ * @returns {{possible: boolean, reattributions: Array<{pose, appareil}>, motif: string|null}}
+ */
+export function planChangementAppareil({ pose, appareilCible, appareils, poses, parametres = {} }) {
+  const p = fusionnerParametres(parametres);
+
+  if (appareilIndisponible(appareilCible)) {
+    return { possible: false, reattributions: [], motif: 'Cet appareil est retiré du parc ou hors service.' };
+  }
+  if (appareilCible.id === pose.appareil_id) {
+    return { possible: false, reattributions: [], motif: 'C’est déjà l’appareil enregistré pour cette pose.' };
+  }
+
+  const finPose = finImmobilisation(pose, p);
+  // Notre pose quitte son appareil d'origine : elle ne compte plus nulle part.
+  const sansNotrePose = poses.filter((x) => x.id !== pose.id);
+
+  const conflits = sansNotrePose.filter((x) => (
+    x.appareil_id === appareilCible.id
+    && poseActive(x)
+    && chevauche(pose.debut, finPose, x.debut, finImmobilisation(x, p))
+  ));
+
+  // Un appareil déjà posé sur un autre patient ne peut pas être « libéré ».
+  const dejaPorte = conflits.find((x) => x.statut === 'pose');
+  if (dejaPorte) {
+    return {
+      possible: false,
+      reattributions: [],
+      motif: 'Cet appareil est actuellement porté par un autre patient : impossible de le réattribuer.',
+    };
+  }
+
+  const provisoires = [];
+  const reattributions = [];
+  for (const conflit of conflits) {
+    const reference = [...sansNotrePose.filter((x) => x.id !== conflit.id), ...provisoires];
+    let libres = appareilsLibres(
+      appareils.filter((a) => a.id !== appareilCible.id),
+      reference,
+      {
+        categorie: appareilCible.categorie,
+        marque: conflit.marque_demandee || null,
+        debut: conflit.debut,
+        fin: finImmobilisation(conflit, p),
+      },
+      p,
+    );
+    if (libres.length === 0 && conflit.marque_demandee && appareilCible.categorie === 'holter_ecg') {
+      libres = appareilsLibres(appareils.filter((a) => a.id !== appareilCible.id), reference, {
+        categorie: appareilCible.categorie, marque: null,
+        debut: conflit.debut, fin: finImmobilisation(conflit, p),
+      }, p);
+    }
+    const remplacant = choisirAppareil(libres, poses, conflit.debut);
+    if (!remplacant) {
+      return {
+        possible: false,
+        reattributions,
+        motif: 'Un patient réservé sur cet appareil n’a aucun appareil de remplacement disponible.',
+      };
+    }
+    provisoires.push({
+      id: null, rdv_id: '__reattribution__', appareil_id: remplacant.id,
+      debut: conflit.debut, fin: conflit.fin, statut: 'prevu',
+    });
+    reattributions.push({ pose: conflit, appareil: remplacant });
+  }
+
+  return { possible: true, reattributions, motif: null };
+}
+
+/**
+ * Réattribution d'une pose dont l'appareil est devenu indisponible (panne,
+ * retrait du parc). Deux niveaux :
+ *   1. un autre appareil libre SUR LE MÊME créneau (le patient n'a rien à
+ *      savoir) ;
+ *   2. sinon, un autre créneau de pose, choisi AU PLUS PRÈS de la durée
+ *      nominale (24 h en général), même si le port est un peu plus court —
+ *      le patient doit alors être rappelé.
+ *
+ * @returns {{type: 'appareil'|'deplacement', appareil, debut: string,
+ *            dureeReelleMinutes: number|null} | null}
+ */
+export function propositionReattribution({ pose, appareil, appareils, poses, parametres = {}, maintenant = null }) {
+  const p = fusionnerParametres(parametres);
+  const categorie = appareil.categorie;
+  const autres = poses.filter((x) => x.id !== pose.id);
+
+  const chercherLibre = (debut) => {
+    let libres = appareilsLibres(appareils, autres, {
+      categorie, marque: pose.marque_demandee || null, debut, fin: pose.fin,
+    }, p);
+    if (libres.length === 0 && pose.marque_demandee && categorie === 'holter_ecg') {
+      libres = appareilsLibres(appareils, autres, { categorie, marque: null, debut, fin: pose.fin }, p);
+    }
+    return choisirAppareil(libres, poses, debut);
+  };
+
+  // 1. Même créneau, autre appareil.
+  const direct = chercherLibre(pose.debut);
+  if (direct) return { type: 'appareil', appareil: direct, debut: pose.debut, dureeReelleMinutes: null };
+
+  // 2. Autre créneau : on relâche la tolérance jusqu'à la moitié de la durée
+  // nominale, et les candidats sortent déjà triés du plus proche de la durée
+  // nominale au plus éloigné.
+  const duree = pose.duree_heures || 24;
+  const souple = { ...p, toleranceDureeMinutes: Math.max(p.toleranceDureeMinutes, (duree * 60) / 2) };
+  const charge = chargeDesCreneaux(autres);
+  const candidats = creneauxPoseCandidats(
+    pose.fin, duree, souple, maintenant, categorie === 'polygraphie' ? 'polygraphie' : null,
+  );
+  for (const candidat of candidats) {
+    if (candidat.horodatage === pose.debut) continue;
+    if (creneauSature(charge, candidat.horodatage, p)) continue;
+    const remplacant = chercherLibre(candidat.horodatage);
+    if (remplacant) {
+      return {
+        type: 'deplacement',
+        appareil: remplacant,
+        debut: candidat.horodatage,
+        dureeReelleMinutes: candidat.dureeReelleMinutes,
+      };
+    }
+  }
+  return null;
 }

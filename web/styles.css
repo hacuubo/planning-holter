@@ -107,6 +107,11 @@ code { background: var(--bord); padding: .1em .35em; border-radius: 4px; font-si
 .onglet:hover { color: var(--texte); }
 .onglet.actif { color: var(--primaire); border-bottom-color: var(--primaire); }
 .onglet span { font-size: 1rem; }
+.pastille-onglet {
+  font-style: normal; font-size: .7rem; font-weight: 800; line-height: 1;
+  background: var(--danger); color: #fff;
+  border-radius: 999px; padding: .18rem .4rem; margin-left: .1rem;
+}
 
 main { padding: 1rem; max-width: 1400px; margin: 0 auto; }
 .vue { display: none; }
@@ -200,6 +205,9 @@ label.champ .facultatif { color: var(--texte-doux); font-weight: 400; }
   padding: .18rem .5rem; border-radius: 999px;
   font-size: .78rem; font-weight: 700; white-space: nowrap;
 }
+/* Légende cliquable du calendrier : un clic masque ou réaffiche un type */
+button.etiquette-filtre { border: none; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 700; }
+.etiquette-filtre.masque { opacity: .35; text-decoration: line-through; }
 .etiquette.holter_ecg-DMS { background: var(--holter-dms-fond); color: var(--holter-dms); }
 .etiquette.holter_ecg-ELA { background: var(--holter-ela-fond); color: var(--holter-ela); }
 .etiquette.mapa          { background: var(--mapa-fond); color: var(--mapa); }
@@ -218,8 +226,14 @@ button.etiquette:focus-visible { outline: 2px solid var(--primaire); outline-off
 
 /* ------------------------------------------------------- Planning du jour */
 .creneau {
-  display: grid; grid-template-columns: 68px 1fr; gap: .6rem;
+  display: grid; grid-template-columns: 68px minmax(0, 1fr) minmax(0, 1fr); gap: .6rem;
   padding: .35rem 0; border-top: 1px solid var(--bord);
+}
+/* En-têtes des deux colonnes de la journée */
+.creneau-entetes {
+  display: grid; grid-template-columns: 68px minmax(0, 1fr) minmax(0, 1fr); gap: .6rem;
+  font-size: .8rem; font-weight: 700; color: var(--texte-doux);
+  text-transform: uppercase; letter-spacing: .04em; padding-bottom: .25rem;
 }
 .creneau.vide { opacity: .45; }
 .creneau-heure {
@@ -333,11 +347,14 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 .calendrier thead th.mois { text-align: left; padding-left: .5rem; font-weight: 800; color: var(--texte); }
 .calendrier th.appareil {
   position: sticky; left: 0; z-index: 2; background: var(--surface);
-  min-width: 132px; max-width: 132px; padding: 0 .5rem; height: 26px;
+  width: 132px; min-width: 132px; max-width: 132px; padding: 0 .5rem; height: 26px;
   text-transform: none; letter-spacing: 0; font-size: .78rem; color: var(--texte);
   border-right: 2px solid var(--bord-fort);
 }
-.calendrier thead th.coin { position: sticky; left: 0; z-index: 4; border-right: 2px solid var(--bord-fort); }
+.calendrier thead th.coin {
+  position: sticky; left: 0; z-index: 4; border-right: 2px solid var(--bord-fort);
+  width: 132px; min-width: 132px; max-width: 132px;
+}
 .calendrier td.jour { height: 26px; position: relative; }
 .calendrier td.week-end { background: var(--fond); }
 .calendrier td.ferie { background: var(--alerte-clair); }
@@ -353,6 +370,14 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 /* Veille de la pose : l'appareil est réservé, en plus clair pour la distinguer
    des jours où il est réellement chez le patient. */
 .calendrier .trait.veille { opacity: .4; }
+/* Heures de pose (à gauche) et de dépose (à droite) sur le trait, affichées
+   en vue rapprochée (3 jours). Le nom du patient reste au milieu. */
+.calendrier .trait .trait-heure {
+  font-weight: 600; opacity: .85; padding: 0 4px; flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.calendrier .trait .trait-heure-fin { margin-left: auto; }
+.calendrier .trait .trait-nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calendrier .trait.holter_ecg-DMS { background: var(--holter-dms); }
 .calendrier .trait.holter_ecg-ELA { background: var(--holter-ela); }
 .calendrier .trait.mapa { background: var(--mapa); }
@@ -412,7 +437,7 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
   .onglet { padding: 0 .7rem; font-size: .82rem; }
   .onglet span { font-size: 1.05rem; }
   .entete-droite .nom-utilisateur { display: none; }
-  .creneau { grid-template-columns: 54px 1fr; }
+  .creneau, .creneau-entetes { grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr); gap: .4rem; }
   .acte { padding: .55rem; }
   .acte-actions { margin-left: 0; width: 100%; }
 }

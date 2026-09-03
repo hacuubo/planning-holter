@@ -21,6 +21,7 @@ export const etat = {
   appareils: [],
   reglages: {},          // contenu brut de la table « parametres »
   poses: [],
+  rappels: [],           // patients à prévenir d'un changement d'horaire
   fenetre: { debut: null, fin: null },
   chargement: false,
   enLigne: true,
@@ -91,14 +92,17 @@ export async function chargerTout() {
   try {
     const debut = ajouterJours(aujourdHui(), -JOURS_AVANT);
     const fin = ajouterJours(aujourdHui(), JOURS_APRES);
-    const [appareils, reglages, poses] = await Promise.all([
+    const [appareils, reglages, poses, rappels] = await Promise.all([
       api.chargerAppareils(),
       api.chargerParametres(),
       api.chargerPoses(debut, fin),
+      // Base pas encore migrée (table absente) : on continue sans rappels.
+      api.listerRappels().catch(() => []),
     ]);
     etat.appareils = appareils;
     etat.reglages = reglages;
     etat.poses = poses;
+    etat.rappels = rappels;
     etat.fenetre = { debut, fin };
     etat.derniereErreur = null;
   } catch (erreur) {

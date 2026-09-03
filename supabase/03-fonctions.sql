@@ -386,6 +386,80 @@ exception
 end $$;
 
 -- =============================================================================
+--  CHANGEMENT D'APPAREILS EN CHAÎNE (correction du jour de la pose)
+-- =============================================================================
+--  Quand le mauvais appareil a été posé sur un patient, on corrige le numéro
+--  et, si cet appareil était réservé pour un autre patient, on réattribue ce
+--  dernier dans la même opération. La liste est appliquée DANS L'ORDRE : les
+--  patients réattribués d'abord, la correction ensuite. Tout réussit ou rien
+--  ne change.
+-- =============================================================================
+create or replace function public.changer_appareils(p_changements jsonb)
+returns jsonb language plpgsql security invoker set search_path = public as $$
+declare
+  v_chg jsonb;
+  v_nb  integer := 0;
+begin
+  if not public.est_actif() then
+    raise exception 'ACCES_REFUSE: votre compte n''est pas autorisé.';
+  end if;
+
+  for v_chg in select * from jsonb_array_elements(p_changements) loop
+    update public.poses
+    set appareil_id = (v_chg ->> 'appareil_id')::uuid
+    where id = (v_chg ->> 'pose_id')::uuid;
+    v_nb := v_nb + 1;
+  end loop;
+
+  perform public.journaliser('changement d''appareils en chaîne', null,
+    jsonb_build_object('changements', p_changements));
+
+  return jsonb_build_object('changements', v_nb);
+
+exception
+  when exclusion_violation then
+    raise exception 'CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.'
+      using errcode = 'exclusion_violation';
+end $$;
+
+-- =============================================================================
+--  RÉATTRIBUTION D'UNE POSE (autre appareil et, si besoin, autre horaire)
+-- =============================================================================
+--  Utilisée par l'onglet Alertes quand un appareil tombe en panne : la pose
+--  du patient reçoit un autre appareil, éventuellement à un autre créneau.
+--  La dépose (liée au rendez-vous cardiologue) ne change pas.
+-- =============================================================================
+create or replace function public.reattribuer_pose(p_pose_id uuid, p_appareil_id uuid, p_debut timestamp)
+returns void language plpgsql security invoker set search_path = public as $$
+declare
+  v_pose public.poses%rowtype;
+begin
+  if not public.est_actif() then
+    raise exception 'ACCES_REFUSE: votre compte n''est pas autorisé.';
+  end if;
+
+  select * into v_pose from public.poses where id = p_pose_id for update;
+  if v_pose.id is null then
+    raise exception 'RDV_INTROUVABLE: cette pose n''existe plus.';
+  end if;
+  if v_pose.statut <> 'prevu' then
+    raise exception 'MATERIEL_DEJA_POSE: cette pose n''est plus modifiable (matériel déjà posé ou rendu).';
+  end if;
+
+  update public.poses
+  set appareil_id = p_appareil_id, debut = p_debut
+  where id = p_pose_id;
+
+  perform public.journaliser('pose réattribuée', p_pose_id::text,
+    jsonb_build_object('appareil', p_appareil_id, 'ancien_debut', v_pose.debut, 'nouveau_debut', p_debut));
+
+exception
+  when exclusion_violation then
+    raise exception 'CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.'
+      using errcode = 'exclusion_violation';
+end $$;
+
+-- =============================================================================
 --  RETRAIT D'UN APPAREIL DU PARC
 --  Refuse tant que des patients dépendent de cet appareil dans le futur.
 -- =============================================================================
@@ -509,6 +583,8 @@ grant execute on function
   public.enregistrer_retour(uuid, timestamp),
   public.enregistrer_pose(uuid),
   public.changer_appareil(uuid, uuid),
+  public.changer_appareils(jsonb),
+  public.reattribuer_pose(uuid, uuid, timestamp),
   public.appareil_poses_futures(uuid),
   public.retirer_appareil(uuid, boolean),
   public.statistiques(integer),

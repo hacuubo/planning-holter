@@ -31,8 +31,8 @@ test('les éléments attendus par le code sont présents dans la page', () => {
     'ecran-connexion', 'formulaire-connexion', 'connexion-email', 'connexion-mdp',
     'connexion-erreur', 'ecran-configuration', 'application', 'titre-cabinet',
     'etat-connexion', 'nom-utilisateur', 'bouton-deconnexion',
-    'bandeau-alerte', 'bandeau-rappel', 'notifications', 'fenetre',
-    'vue-jour', 'vue-rdv', 'vue-recherche', 'vue-calendrier', 'vue-parametres',
+    'bandeau-alerte', 'bandeau-rappel', 'notifications', 'fenetre', 'pastille-alertes',
+    'vue-jour', 'vue-rdv', 'vue-recherche', 'vue-calendrier', 'vue-alertes', 'vue-parametres',
   ];
   for (const id of identifiants) {
     assert.ok(INDEX.includes(`id="${id}"`), `identifiant manquant dans index.html : ${id}`);
@@ -41,7 +41,7 @@ test('les éléments attendus par le code sont présents dans la page', () => {
 
 test('chaque onglet a bien une vue correspondante', () => {
   const onglets = [...INDEX.matchAll(/data-onglet="([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(onglets, ['jour', 'rdv', 'recherche', 'calendrier', 'parametres']);
+  assert.deepEqual(onglets, ['jour', 'rdv', 'recherche', 'calendrier', 'alertes', 'parametres']);
   for (const onglet of onglets) {
     assert.ok(INDEX.includes(`id="vue-${onglet}"`), `vue manquante pour l’onglet ${onglet}`);
   }

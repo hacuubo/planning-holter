@@ -66,23 +66,26 @@ function sectionMateriel(admin) {
       : (CATEGORIES[categorie]?.libelle || categorie);
     const enService = liste.filter((a) => a.actif !== false);
 
+    const indisponible = (a) => a.actif === false || a.hors_service === true;
     return el(
       'div',
       { style: 'margin-bottom:1rem' },
-      el('h3', {}, `${titre} — ${enService.length} en service`),
+      el('h3', {}, `${titre} — ${enService.filter((a) => !a.hors_service).length} en service`),
       el('div', { class: 'legende' }, liste.map((a) => el(
         admin ? 'button' : 'span',
         {
-          class: `etiquette ${a.actif === false ? 'neutre' : (a.categorie === 'holter_ecg' ? `holter_ecg-${a.marque}` : a.categorie)}`,
+          class: `etiquette ${indisponible(a) ? 'neutre' : (a.categorie === 'holter_ecg' ? `holter_ecg-${a.marque}` : a.categorie)}`,
           type: admin ? 'button' : null,
+          style: a.hors_service && a.actif !== false ? 'opacity:.55' : null,
           title: a.actif === false
             ? 'Appareil retiré du parc'
-            : (admin ? `Gérer ${libelleAppareil(a)}` : ''),
+            : (a.hors_service ? 'Appareil momentanément hors service'
+              : (admin ? `Gérer ${libelleAppareil(a)}` : '')),
           onclick: admin ? () => gererAppareil(a) : null,
         },
         libelleCourt(a),
         a.urgence ? ' ⚠' : '',
-        a.actif === false ? ' (retiré)' : '',
+        a.actif === false ? ' (retiré)' : (a.hors_service ? ' ⛔ hors service' : ''),
       ))),
     );
   });
@@ -171,24 +174,52 @@ function ajouterAppareil() {
 }
 
 function gererAppareil(appareil) {
+  const etatTexte = appareil.actif === false
+    ? 'retiré du parc'
+    : (appareil.hors_service ? 'momentanément hors service' : 'en service');
+
   ouvrirFenetre((fermer) => [
     el('h2', {}, libelleAppareil(appareil)),
     el(
       'div',
       { class: 'recap' },
       el('div', { class: 'recap-ligne' }, etiquetteAppareil(appareil),
-        el('span', { class: 'aide' }, appareil.actif === false ? 'retiré du parc' : 'en service')),
+        el('span', { class: 'aide' }, etatTexte)),
     ),
+    appareil.actif !== false && !appareil.hors_service
+      ? el('p', { class: 'aide' },
+        '« Hors service » : panne passagère, l’appareil reste dans le parc et se '
+        + 'réactive d’un clic. « Retirer du parc » : sortie définitive (réforme).')
+      : null,
     el(
       'div',
       { class: 'fenetre-actions' },
       el('button', { class: 'bouton', onclick: fermer }, 'Fermer'),
+      appareil.actif !== false && appareil.hors_service
+        ? el('button', {
+          class: 'bouton principal',
+          onclick: async () => {
+            try {
+              await api.modifierAppareil(appareil.id, { hors_service: false });
+              fermer(); await rafraichir();
+              notifier(`${libelleAppareil(appareil)} est de nouveau en service.`, 'succes');
+              redessiner();
+            } catch (erreur) { notifierErreur(erreur); }
+          },
+        }, 'Remettre en service')
+        : null,
+      appareil.actif !== false && !appareil.hors_service
+        ? el('button', {
+          class: 'bouton',
+          onclick: () => { fermer(); mettreHorsService(appareil); },
+        }, '⛔ Mettre hors service')
+        : null,
       appareil.actif === false
         ? el('button', {
           class: 'bouton principal',
           onclick: async () => {
             try {
-              await api.modifierAppareil(appareil.id, { actif: true });
+              await api.modifierAppareil(appareil.id, { actif: true, hors_service: false });
               fermer(); await rafraichir(); notifier('Appareil remis en service.', 'succes'); redessiner();
             } catch (erreur) { notifierErreur(erreur); }
           },
@@ -199,6 +230,39 @@ function gererAppareil(appareil) {
         }, 'Retirer du parc'),
     ),
   ]);
+}
+
+/**
+ * Mise hors service temporaire (panne). L'appareil n'est plus jamais proposé
+ * tant qu'il n'est pas réactivé ; les patients qui l'attendaient apparaissent
+ * dans l'onglet Alertes pour être réattribués.
+ */
+async function mettreHorsService(appareil) {
+  let futures = [];
+  try {
+    futures = await api.posesFutures(appareil.id);
+  } catch (erreur) { notifierErreur(erreur); return; }
+
+  const ok = await confirmer({
+    titre: `Mettre ${libelleAppareil(appareil)} hors service ?`,
+    message: futures.length === 0
+      ? 'Aucun patient ne l’attend. Il ne sera plus proposé jusqu’à sa remise en service.'
+      : `${futures.length} patient(s) doivent encore le recevoir : après la mise hors service, `
+        + 'retrouvez-les dans l’onglet Alertes pour les réattribuer automatiquement.',
+    boutonValider: 'Mettre hors service',
+    danger: futures.length > 0,
+  });
+  if (!ok) return;
+
+  try {
+    await api.modifierAppareil(appareil.id, { hors_service: true });
+    await rafraichir();
+    notifier(futures.length === 0
+      ? 'Appareil mis hors service.'
+      : `Appareil mis hors service : ${futures.length} patient(s) à réattribuer dans l’onglet Alertes.`,
+    futures.length === 0 ? 'succes' : 'alerte');
+    redessiner();
+  } catch (erreur) { notifierErreur(erreur); }
 }
 
 async function supprimerAppareil(appareil) {

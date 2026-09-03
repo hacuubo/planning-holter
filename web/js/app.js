@@ -16,6 +16,7 @@ import { afficherJour } from './ui/onglet-jour.js';
 import { afficherRdv } from './ui/onglet-rdv.js';
 import { afficherRecherche } from './ui/onglet-recherche.js';
 import { afficherCalendrier } from './ui/onglet-calendrier.js';
+import { afficherAlertes, nombreAlertes } from './ui/onglet-alertes.js';
 import { afficherParametres } from './ui/onglet-parametres.js';
 import { disponibilitesParType } from './core/regles.js';
 import { ajouterJours, aujourdHui, decouper, maintenantHorodatage } from './core/dates.js';
@@ -25,6 +26,7 @@ const VUES = {
   rdv: { element: 'vue-rdv', afficher: afficherRdv },
   recherche: { element: 'vue-recherche', afficher: afficherRecherche },
   calendrier: { element: 'vue-calendrier', afficher: afficherCalendrier },
+  alertes: { element: 'vue-alertes', afficher: afficherAlertes },
   parametres: { element: 'vue-parametres', afficher: afficherParametres },
 };
 
@@ -194,7 +196,22 @@ function rafraichirEcran() {
 
   majBandeauAlerte();
   majRappelReglages();
+  majPastilleAlertes();
   dessinerVue(ongletActif);
+}
+
+/**
+ * Pastille de l'onglet Alertes : réservations sur un appareil indisponible
+ * et patients à rappeler. Recalculée à chaque rafraîchissement des données,
+ * donc à chaque nouvelle demande.
+ */
+function majPastilleAlertes() {
+  const pastille = document.getElementById('pastille-alertes');
+  if (!pastille) return;
+  let nb = 0;
+  try { nb = nombreAlertes(); } catch { nb = 0; }
+  pastille.textContent = String(nb);
+  pastille.hidden = nb === 0;
 }
 
 /**

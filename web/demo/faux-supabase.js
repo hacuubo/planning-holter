@@ -35,6 +35,7 @@ const base = {
   appareils: INVENTAIRE_INITIAL.map((a) => ({ ...a, id: identifiant('app'), actif: true })),
   rendez_vous: [],
   poses: [],
+  rappels: [],
   parametres: [
     {
       cle: 'planification',
@@ -51,7 +52,7 @@ const base = {
     { cle: 'horaires', valeur: HORAIRES_PAR_DEFAUT },
     { cle: 'cardiologues', valeur: CARDIOS },
     { cle: 'sauvegarde', valeur: { destinataires: ['secretariat@exemple.fr'], frequence: 'quotidien', joursConservation: 7 } },
-    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.2.0' } },
+    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.3.0' } },
   ],
 };
 
@@ -369,6 +370,39 @@ const fonctions = {
     ));
     if (conflit) throw new Error('CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.');
     pose.appareil_id = p_appareil_id;
+    diffuser();
+    return null;
+  },
+
+  changer_appareils({ p_changements }) {
+    for (const chg of p_changements) {
+      const pose = base.poses.find((p) => p.id === chg.pose_id);
+      if (!pose) throw new Error('RDV_INTROUVABLE: cette pose n’existe plus.');
+      const conflit = base.poses.some((p) => (
+        p.id !== pose.id && p.appareil_id === chg.appareil_id && p.statut !== 'annule'
+        && chevauchement(pose.debut, pose.fin, p.debut, p.retour_effectif || p.fin)
+        && !p_changements.some((c) => c.pose_id === p.id) // celui-ci va bouger aussi
+      ));
+      if (conflit) throw new Error('CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.');
+      pose.appareil_id = chg.appareil_id;
+    }
+    diffuser();
+    return { changements: p_changements.length };
+  },
+
+  reattribuer_pose({ p_pose_id, p_appareil_id, p_debut }) {
+    const pose = base.poses.find((p) => p.id === p_pose_id);
+    if (!pose) throw new Error('RDV_INTROUVABLE: cette pose n’existe plus.');
+    if (pose.statut !== 'prevu') {
+      throw new Error('MATERIEL_DEJA_POSE: cette pose n’est plus modifiable.');
+    }
+    const conflit = base.poses.some((p) => (
+      p.id !== pose.id && p.appareil_id === p_appareil_id && p.statut !== 'annule'
+      && chevauchement(p_debut, pose.fin, p.debut, p.retour_effectif || p.fin)
+    ));
+    if (conflit) throw new Error('CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.');
+    pose.appareil_id = p_appareil_id;
+    pose.debut = p_debut;
     diffuser();
     return null;
   },

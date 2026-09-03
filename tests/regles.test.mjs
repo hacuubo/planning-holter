@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {
   appareilOccupe, appareilsLibres, chargeDesCreneaux, chevauche, choisirAppareil,
   creneauDepose, creneauSature, creneauxPoseCandidats, creneauxPoseDuJour,
-  disponibilitesParType, placesRestantes, planifier, poseIdeale,
-  propositionsAlternatives,
+  disponibilitesParType, placesRestantes, planChangementAppareil, planifier,
+  poseIdeale, propositionReattribution, propositionsAlternatives,
 } from '../web/js/core/regles.js';
 import { INVENTAIRE_INITIAL } from '../web/js/core/materiel.js';
 import { ajouterJours, decouper } from '../web/js/core/dates.js';
@@ -582,4 +582,114 @@ test('inventaire du cabinet conforme au parc réel', () => {
   // Aucun code en double au sein d'un même type de matériel.
   const cles = APPAREILS.map((a) => `${a.categorie}|${a.marque || ''}|${a.code}`);
   assert.equal(new Set(cles).size, cles.length, 'chaque appareil doit être identifiable sans ambiguïté');
+});
+
+// ---------------------------------------------------------------------------
+// Appareils hors service et réattributions
+// ---------------------------------------------------------------------------
+
+/** Parc où certains codes ELA sont momentanément hors service. */
+function parcAvecPannes(codesEnPanne) {
+  return APPAREILS.map((a) => (
+    codesEnPanne.includes(`${a.marque || ''}${a.code}`) ? { ...a, hors_service: true } : a
+  ));
+}
+
+test('un appareil hors service n’est jamais proposé', () => {
+  const appareils = parcAvecPannes(['ELA51']);
+  const libres = appareilsLibres(appareils, [], {
+    categorie: 'holter_ecg', marque: 'ELA', debut: '2026-08-24 09:45', fin: '2026-08-25 09:45',
+  });
+  assert.equal(libres.length, 8); // 52 à 59
+  assert.ok(!libres.some((a) => a.code === '51'));
+
+  const dispo = disponibilitesParType(appareils, [], '2026-08-24 09:45', '2026-08-25 09:45');
+  assert.equal(dispo.find((d) => d.cle === 'holter_ecg|ELA').total, 8);
+});
+
+test('correction d’appareil : cible libre, aucun autre patient touché', () => {
+  const p1 = pose(parCode('1', 'DMS'), '2026-08-24 09:45', '2026-08-25 09:45', { rdv_id: 'r1' });
+  const plan = planChangementAppareil({
+    pose: p1, appareilCible: parCode('2', 'DMS'), appareils: APPAREILS, poses: [p1],
+  });
+  assert.ok(plan.possible);
+  assert.equal(plan.reattributions.length, 0);
+});
+
+test('correction d’appareil : le patient qui réservait la cible est réattribué', () => {
+  const p1 = pose(parCode('1', 'DMS'), '2026-08-24 09:45', '2026-08-25 09:45', { rdv_id: 'r1' });
+  const p2 = pose(parCode('2', 'DMS'), '2026-08-24 10:00', '2026-08-25 10:00', { rdv_id: 'r2' });
+  const plan = planChangementAppareil({
+    pose: p1, appareilCible: parCode('2', 'DMS'), appareils: APPAREILS, poses: [p1, p2],
+  });
+  assert.ok(plan.possible);
+  assert.equal(plan.reattributions.length, 1);
+  assert.equal(plan.reattributions[0].pose.id, p2.id);
+  assert.notEqual(plan.reattributions[0].appareil.id, parCode('2', 'DMS').id);
+  assert.equal(plan.reattributions[0].appareil.categorie, 'holter_ecg');
+});
+
+test('correction d’appareil : refus si la cible est déjà portée par un patient', () => {
+  const p1 = pose(parCode('1', 'DMS'), '2026-08-24 09:45', '2026-08-25 09:45', { rdv_id: 'r1' });
+  const p2 = pose(parCode('2', 'DMS'), '2026-08-24 10:00', '2026-08-25 10:00', { rdv_id: 'r2', statut: 'pose' });
+  const plan = planChangementAppareil({
+    pose: p1, appareilCible: parCode('2', 'DMS'), appareils: APPAREILS, poses: [p1, p2],
+  });
+  assert.ok(!plan.possible);
+  assert.match(plan.motif, /porté/);
+});
+
+test('réattribution après panne : même créneau si un appareil est libre', () => {
+  const appareils = parcAvecPannes(['ELA51']);
+  const enPanne = appareils.find((a) => a.code === '51' && a.marque === 'ELA');
+  const p1 = {
+    ...pose(enPanne, '2026-08-24 09:45', '2026-08-25 09:45', { rdv_id: 'r1' }),
+    marque_demandee: 'ELA', duree_heures: 24,
+  };
+  const prop = propositionReattribution({
+    pose: p1, appareil: enPanne, appareils, poses: [p1],
+  });
+  assert.equal(prop.type, 'appareil');
+  assert.equal(prop.debut, '2026-08-24 09:45'); // le patient n'a rien à savoir
+  assert.equal(prop.appareil.marque, 'ELA');
+  assert.notEqual(prop.appareil.code, '51');
+});
+
+test('réattribution après panne : sinon le créneau le plus proche de 24 h, même plus court', () => {
+  const appareils = parcAvecPannes(['ELA51']);
+  const enPanne = appareils.find((a) => a.code === '51' && a.marque === 'ELA');
+  const p1 = {
+    ...pose(enPanne, '2026-08-24 09:45', '2026-08-25 09:45', { rdv_id: 'r1' }),
+    marque_demandee: 'ELA', duree_heures: 24,
+  };
+  // Tous les autres Holter (ELA et DMS) sont occupés jusqu'au 24/08 à 11:30 :
+  // aucun n'est libre à 09:45, mais tous le redeviennent à 11:30.
+  const occupations = appareils
+    .filter((a) => a.categorie === 'holter_ecg' && !a.urgence && !a.hors_service)
+    .map((a, i) => pose(a, '2026-08-23 10:00', '2026-08-24 11:30', { rdv_id: `occ-${i}` }));
+
+  const prop = propositionReattribution({
+    pose: p1, appareil: enPanne, appareils, poses: [p1, ...occupations],
+  });
+  assert.equal(prop.type, 'deplacement');
+  assert.equal(prop.debut, '2026-08-24 11:30'); // premier créneau libéré, le plus proche de 24 h
+  assert.equal(prop.dureeReelleMinutes, (24 * 60) - 105); // port de 22 h 15 : accepté
+});
+
+test('réattribution après panne : null quand rien n’est possible', () => {
+  // Les trois polygraphes : N1 en panne, N2 et N3 immobilisés sur toute la période.
+  const appareils = APPAREILS.map((a) => (a.code === 'N1' ? { ...a, hors_service: true } : a));
+  const n1 = appareils.find((a) => a.code === 'N1');
+  const p1 = {
+    ...pose(n1, '2026-08-24 17:15', '2026-08-25 09:45', { rdv_id: 'r1' }),
+    duree_heures: 24,
+  };
+  const occupations = ['N2', 'N3'].map((code, i) => pose(
+    appareils.find((a) => a.code === code),
+    '2026-08-24 14:00', '2026-08-25 11:30', { rdv_id: `occ-${i}` },
+  ));
+  const prop = propositionReattribution({
+    pose: p1, appareil: n1, appareils, poses: [p1, ...occupations],
+  });
+  assert.equal(prop, null);
 });

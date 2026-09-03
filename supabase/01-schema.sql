@@ -36,6 +36,7 @@ create table if not exists public.appareils (
   marque       text,
   urgence      boolean not null default false,
   actif        boolean not null default true,
+  hors_service boolean not null default false,
   ordre        integer not null default 0,
   commentaire  text,
   cree_le      timestamptz not null default now()
@@ -49,6 +50,8 @@ comment on column public.appareils.urgence is
   'Appareil réservé aux urgences : jamais attribué automatiquement.';
 comment on column public.appareils.actif is
   'false = appareil retiré du parc. On ne supprime jamais physiquement un appareil ayant servi.';
+comment on column public.appareils.hors_service is
+  'true = appareil momentanément indisponible (panne). Il reste dans le parc et se réactive d''un clic.';
 
 -- -----------------------------------------------------------------------------
 -- Rendez-vous patients
@@ -146,6 +149,24 @@ create table if not exists public.journal (
   details   jsonb
 );
 
+-- -----------------------------------------------------------------------------
+-- Rappels téléphoniques
+-- Quand une réattribution change l'horaire de pose d'un patient, une ligne
+-- est créée ici pour que le secrétariat pense à le prévenir.
+-- -----------------------------------------------------------------------------
+create table if not exists public.rappels (
+  id           uuid primary key default gen_random_uuid(),
+  rdv_id       uuid references public.rendez_vous (id) on delete cascade,
+  patient_nom  text not null,
+  telephone    text,
+  message      text not null,
+  fait         boolean not null default false,
+  fait_par     text,
+  cree_le      timestamptz not null default now()
+);
+
+create index if not exists rappels_fait_idx on public.rappels (fait, cree_le);
+
 create index if not exists journal_quand_idx on public.journal (quand desc);
 
 -- -----------------------------------------------------------------------------
@@ -184,7 +205,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['rendez_vous', 'poses', 'appareils', 'parametres'] loop
+  foreach t in array array['rendez_vous', 'poses', 'appareils', 'parametres', 'rappels'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
