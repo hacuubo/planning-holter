@@ -52,7 +52,7 @@ const base = {
     { cle: 'horaires', valeur: HORAIRES_PAR_DEFAUT },
     { cle: 'cardiologues', valeur: CARDIOS },
     { cle: 'sauvegarde', valeur: { destinataires: ['secretariat@exemple.fr'], frequence: 'quotidien', joursConservation: 7 } },
-    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.4.1' } },
+    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.5.0' } },
   ],
 };
 

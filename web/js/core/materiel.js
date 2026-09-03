@@ -22,8 +22,8 @@ export const CATEGORIES = {
   mapa: {
     code: 'mapa',
     libelle: 'MAPA',
-    couleur: '#7c3aed',
-    fond: '#ede9fe',
+    couleur: '#dc2626',
+    fond: '#fee2e2',
     dureesHeures: [24],
     dureeParDefaut: 24,
     marques: [],
@@ -31,8 +31,8 @@ export const CATEGORIES = {
   polygraphie: {
     code: 'polygraphie',
     libelle: 'Polygraphie ventilatoire',
-    couleur: '#0f766e',
-    fond: '#ccfbf1',
+    couleur: '#15803d',
+    fond: '#dcfce7',
     dureesHeures: [24],
     dureeParDefaut: 24,
     marques: [],
