@@ -27,7 +27,8 @@ En haut à droite, une petite pastille indique l'état de la liaison :
 
 C'est l'écran de la personne qui s'occupe du matériel.
 
-- Les créneaux s'affichent de haut en bas, tous les quarts d'heure.
+- Les créneaux s'affichent de haut en bas, tous les quarts d'heure, sur
+  **deux colonnes** : les **poses à gauche**, les **déposes à droite**.
 - Chaque acte indique le patient (nom de famille et sexe), le cardiologue,
   l'appareil et sa couleur.
 - **⬇ = pose**, **⬆ = dépose**.
@@ -115,8 +116,14 @@ actuel : changez la date, l'heure ou le matériel (le type de Holter, par
 exemple) et le logiciel recalcule aussitôt la pose, la dépose et les appareils,
 comme lors d'une prise de rendez-vous. L'ancien créneau est libéré
 automatiquement à l'enregistrement. Si le nouveau créneau est impossible,
-d'autres rendez-vous sont proposés. Un rendez-vous dont le matériel est déjà
-posé ne peut plus être déplacé : annulez-le puis reprenez un rendez-vous.
+d'autres rendez-vous sont proposés.
+
+Le déplacement reste possible **même une fois le matériel posé ou rendu**, y
+compris pour un rendez-vous passé : l'appareil et sa date de pose ne bougent
+alors plus, seule la **dépose suit le nouveau rendez-vous** (matériel posé) ;
+un matériel déjà rendu reste inchangé et seule la date du rendez-vous
+cardiologue est modifiée. Le logiciel vérifie que l'appareil n'est pas promis
+à un autre patient sur la période prolongée.
 
 **Annuler le rendez-vous** libère immédiatement le matériel pour d'autres
 patients. Le rendez-vous n'est pas effacé : il reste consultable, marqué
@@ -128,10 +135,46 @@ patients. Le rendez-vous n'est pas effacé : il reste consultable, marqué
 
 Le matériel en lignes, les jours en colonnes. Chaque trait coloré est un examen
 en cours : on voit d'un coup d'œil les périodes chargées et les appareils libres.
-Cliquez sur un trait pour voir le patient concerné.
+Pour un Holter 24 h, le trait court sur **trois jours** : la **veille de la
+pose** (en plus clair — l'appareil est réservé), le **jour de pose** au milieu,
+où s'inscrit le nom du patient, et le **jour de dépose**. Les examens plus
+longs (48 h, 72 h, Spider Flash) s'étendent d'autant. Cliquez sur un trait pour
+voir le patient concerné.
 
-Les boutons du haut font défiler mois par mois ; la liste déroulante permet
-d'afficher 30 à 120 jours d'un coup.
+Les boutons du haut font défiler la période ; la liste déroulante permet
+d'afficher de **3** à 120 jours d'un coup. En vue **3 jours**, chaque trait
+affiche l'**heure de pose à gauche**, le **nom du patient** au milieu et
+l'**heure de dépose à droite**.
+
+**Filtrer par type** — cliquez sur un type dans la légende (Holter DMS,
+Holter ELA, MAPA…) pour le masquer et alléger le tableau ; un second clic
+(ou « Tout afficher ») le réaffiche.
+
+**Corriger un numéro d'appareil** — si le mauvais appareil a été posé,
+cliquez sur le trait puis « Changer d'appareil » et choisissez l'appareil
+réellement posé. S'il était réservé pour un autre patient, ce dernier est
+**réattribué automatiquement** à un autre appareil (celui d'origine, redevenu
+libre, en fait partie), le tout en une seule opération. Une fenêtre d'alerte
+prévient si un conflit rend la correction impossible — par exemple si
+l'appareil choisi est déjà porté par un autre patient.
+
+---
+
+## Onglet **Alertes** — ce qui demande une action
+
+Une pastille rouge sur l'onglet indique le nombre d'alertes en cours,
+recalculé à chaque nouvelle demande et à chaque modification :
+
+1. **Réservations sur un appareil indisponible** (hors service ou retiré du
+   parc). Le bouton **Réattribuer** cherche d'abord un autre appareil sur le
+   **même créneau** — le patient n'a rien à savoir. Sinon, il propose le
+   créneau **le plus proche de la durée de port prévue** (24 h en général,
+   parfois un peu moins) : après confirmation, le patient est ajouté à la
+   liste des rappels.
+2. **Patients à rappeler** — chaque fois qu'un horaire de pose a été modifié
+   après coup, le patient apparaît ici avec son téléphone et le détail du
+   changement. Cochez « Rappelé » une fois le patient prévenu ; la liste est
+   partagée entre toutes les secrétaires.
 
 ---
 
@@ -142,7 +185,13 @@ Voir [04-MISES-A-JOUR.md](04-MISES-A-JOUR.md) pour les changements plus
 profonds.
 
 **Parc matériel** — cliquez sur un appareil pour le gérer.
-Pour **retirer** un appareil (panne, réforme) : si des patients l'attendent
+
+**Mettre hors service** (panne passagère) : l'appareil est grisé et n'est plus
+jamais proposé, mais reste dans le parc ; un clic sur « Remettre en service »
+le réactive. Les patients qui l'attendaient apparaissent dans l'onglet
+**Alertes** pour être réattribués.
+
+Pour **retirer** définitivement un appareil (réforme) : si des patients l'attendent
 encore, le logiciel refuse, **liste les patients concernés** et propose de tous
 les réattribuer automatiquement à d'autres appareils du même type. Vous validez
 en un clic.

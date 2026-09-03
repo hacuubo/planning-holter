@@ -197,22 +197,32 @@ function listeDesCreneaux(actes, ouvert) {
       `${nbPoses} pose${nbPoses > 1 ? 's' : ''} et ${nbDeposes} dépose${nbDeposes > 1 ? 's' : ''} `
       + `pour ${new Set(actes.map((a) => a.pose.rdv_id)).size} patient(s).`,
     ),
+    el(
+      'div',
+      { class: 'creneau-entetes' },
+      el('span', {}, 'Heure'),
+      el('span', {}, '⬇ Poses'),
+      el('span', {}, '⬆ Déposes'),
+    ),
     toutes.map((h) => ligneCreneau(h, parHeure.get(h) || [])),
   );
 }
 
+/** Une ligne par quart d'heure : les poses à gauche, les déposes à droite. */
 function ligneCreneau(heure, actes) {
+  const poses = actes.filter((a) => a.type === 'pose');
+  const deposes = actes.filter((a) => a.type === 'depose');
+  const colonne = (liste) => el(
+    'div',
+    { class: 'creneau-actes' },
+    liste.length ? liste.map(carteActe) : el('div', { class: 'creneau-libre' }, '—'),
+  );
   return el(
     'div',
     { class: `creneau ${actes.length ? 'plein' : 'vide'}` },
     el('div', { class: 'creneau-heure' }, heure),
-    el(
-      'div',
-      { class: 'creneau-actes' },
-      actes.length
-        ? actes.map(carteActe)
-        : el('div', { class: 'creneau-libre' }, '—'),
-    ),
+    colonne(poses),
+    colonne(deposes),
   );
 }
 

@@ -9,7 +9,9 @@ import {
   maintenantHorodatage,
 } from '../core/dates.js';
 import { CATEGORIES, dureeLisible, dureeParDefaut, dureesAutorisees } from '../core/materiel.js';
-import { planifier, propositionsAlternatives } from '../core/regles.js';
+import {
+  appareilOccupe, creneauDepose, planifier, propositionsAlternatives,
+} from '../core/regles.js';
 import * as api from '../data/api.js';
 import { appareilParId, etat, parametres, posesActives, rafraichir } from '../data/etat.js';
 import {
@@ -174,16 +176,26 @@ function libelleStatut(statut) {
  * nouveau matériel (changer le type de Holter, par exemple). Le logiciel
  * recalcule la proposition comme pour une prise de rendez-vous, sans que le
  * rendez-vous existant ne se bloque lui-même.
+ *
+ * Le rendez-vous reste déplaçable une fois le matériel posé, et même une
+ * fois rendu : l'appareil et sa pose ne bougent alors plus, seule la dépose
+ * suit le nouveau rendez-vous (matériel posé) ou rien ne change du tout
+ * (matériel déjà rendu).
  */
 function deplacer(rdv) {
   const posesEnCours = rdv.poses.filter((p) => p.statut !== 'annule');
-  if (posesEnCours.some((p) => p.statut !== 'prevu')) {
-    notifier('Le matériel de ce rendez-vous est déjà posé ou rendu : '
-      + 'il ne peut plus être déplacé. Annulez-le puis reprenez un rendez-vous.', 'erreur');
-    return;
-  }
+  const posesPosees = posesEnCours.filter((p) => p.statut === 'pose');
+  const posesRendues = posesEnCours.filter((p) => p.statut === 'rendu');
+  const posesPrevues = posesEnCours.filter((p) => p.statut === 'prevu');
 
-  // Saisie préremplie avec le rendez-vous actuel.
+  // Catégories dont le matériel est déjà sorti : elles ne sont plus éditables.
+  const categoriesFigees = new Set(
+    [...posesPosees, ...posesRendues]
+      .map((p) => appareilParId(p.appareil_id)?.categorie)
+      .filter(Boolean),
+  );
+
+  // Saisie préremplie avec le rendez-vous actuel (matériel encore à poser).
   const saisie = {
     date: decouper(rdv.rdv_cardio).date,
     heure: decouper(rdv.rdv_cardio).heure,
@@ -194,7 +206,7 @@ function deplacer(rdv) {
       spider: { actif: false, marque: null, duree: dureeParDefaut('spider') },
     },
   };
-  for (const pose of posesEnCours) {
+  for (const pose of posesPrevues) {
     const appareil = appareilParId(pose.appareil_id);
     const m = appareil ? saisie.materiels[appareil.categorie] : null;
     if (!m) continue;
@@ -204,13 +216,15 @@ function deplacer(rdv) {
   }
 
   let plan = null;
+  let deposeRetenue = null;
+  let realisable = false;
 
   ouvrirFenetre((fermer) => {
     const zoneResultat = el('div', {});
     const boutonEnregistrer = el('button', { class: 'bouton principal' }, 'Enregistrer le déplacement');
 
     const materielsDemandes = () => Object.entries(saisie.materiels)
-      .filter(([, m]) => m.actif)
+      .filter(([categorie, m]) => m.actif && !categoriesFigees.has(categorie))
       .map(([categorie, m]) => ({
         categorie,
         marque: categorie === 'holter_ecg' ? m.marque : null,
@@ -221,70 +235,157 @@ function deplacer(rdv) {
       const params = parametres();
       const materiels = materielsDemandes();
       const maintenant = maintenantHorodatage();
+      plan = null;
+      deposeRetenue = null;
+      realisable = false;
 
-      if (!saisie.date || !saisie.heure || materiels.length === 0) {
-        plan = null;
+      if (!saisie.date || !saisie.heure
+        || (materiels.length === 0 && posesPosees.length === 0 && posesRendues.length === 0)) {
         boutonEnregistrer.disabled = true;
         remplir(zoneResultat, messageVide('Choisissez une date, une heure et au moins un matériel.'));
         return;
       }
 
       const rdvCardio = horodatage(saisie.date, saisie.heure);
-      plan = planifier({
-        rdvCardio, materiels, appareils: etat.appareils, poses: posesActives(),
-        parametres: params, maintenant, rdvIgnoreId: rdv.id,
-      });
-      boutonEnregistrer.disabled = !plan.possible;
+      // Les poses encore prévues de CE rendez-vous sont retirées du planning
+      // de référence (elles vont être remplacées) ; le matériel déjà posé y
+      // reste, puisqu'il est réellement chez le patient.
+      const posesReference = posesActives()
+        .filter((p) => !(p.rdv_id === rdv.id && p.statut === 'prevu'));
 
-      const elements = plan.avertissements.map((a) => encart(plan.possible ? 'alerte' : 'erreur', a));
+      const avertissements = [];
+      const erreurs = [];
 
-      if (plan.possible) {
-        const depose = decouper(plan.depose);
-        elements.push(encart(
-          'succes',
-          el('strong', {}, '✔ Déplacement réalisable. '),
-          `Dépose du matériel le ${dateEnFrancais(depose.date)} à ${depose.heure}.`,
-        ));
-        elements.push(el('div', { class: 'recap' }, plan.lignes.map((ligne) => el(
+      if (materiels.length > 0) {
+        plan = planifier({
+          rdvCardio, materiels, appareils: etat.appareils, poses: posesReference,
+          parametres: params, maintenant,
+        });
+        avertissements.push(...plan.avertissements);
+        deposeRetenue = plan.depose;
+      } else {
+        const d = creneauDepose(rdvCardio, params);
+        if (d.avertissement) avertissements.push(d.avertissement);
+        deposeRetenue = d.horodatage;
+      }
+
+      // Matériel déjà posé : l'appareil et la pose ne bougent pas, la dépose
+      // est déplacée sur le nouveau créneau.
+      for (const pose of posesPosees) {
+        const appareil = appareilParId(pose.appareil_id);
+        if (!deposeRetenue) {
+          erreurs.push('Aucun créneau de dépose n\u2019est possible pour ce rendez-vous.');
+          break;
+        }
+        if (deposeRetenue <= pose.debut) {
+          erreurs.push(`La nouvelle dépose précéderait la pose du ${dateEnFrancais(decouper(pose.debut).date)} `
+            + `(${appareil ? appareil.code : '?'}) : choisissez un rendez-vous plus tardif.`);
+          continue;
+        }
+        if (appareilOccupe(
+          pose.appareil_id,
+          posesReference.filter((x) => x.id !== pose.id),
+          pose.debut, deposeRetenue, params,
+        )) {
+          erreurs.push(`L\u2019appareil ${appareil ? appareil.code : '?'} est déjà réservé par un autre patient `
+            + 'sur la période prolongée : rapprochez le rendez-vous ou libérez l\u2019appareil.');
+        }
+        if (appareil?.categorie === 'polygraphie' && decouper(deposeRetenue).heure >= '12:00') {
+          avertissements.push('La polygraphie se dépose normalement le matin : '
+            + 'vérifiez que cette dépose l\u2019après-midi convient.');
+        }
+      }
+
+      realisable = !!deposeRetenue
+        && erreurs.length === 0
+        && (plan === null || plan.possible);
+      boutonEnregistrer.disabled = !realisable;
+
+      const elements = [];
+      for (const a of avertissements) elements.push(encart(realisable ? 'alerte' : 'erreur', a));
+      for (const e of erreurs) elements.push(encart('erreur', e));
+
+      const lignesRecap = [];
+      for (const pose of posesPosees) {
+        lignesRecap.push(el(
           'div',
           { class: 'recap-ligne' },
-          etiquetteAppareil(ligne.appareil),
+          etiquetteAppareil(appareilParId(pose.appareil_id)),
           el('span', {},
-            el('strong', {}, `Pose ${dateEnFrancais(decouper(ligne.pose).date)} à ${decouper(ligne.pose).heure}`),
-            ` · dépose ${dateEnFrancais(decouper(ligne.depose).date)} à ${decouper(ligne.depose).heure}`),
-        ))));
-      } else {
-        elements.push(encart(
-          'erreur',
-          el('strong', {}, '✖ Ce déplacement n’est pas réalisable en l’état.'),
-          el('ul', {}, plan.lignes
-            .filter((l) => l.motifEchec)
-            .map((l) => el('li', {}, l.motifEchec))),
+            `Déjà posé le ${dateEnFrancais(decouper(pose.debut).date)} à ${decouper(pose.debut).heure}`,
+            deposeRetenue && realisable
+              ? el('span', {}, ' · ', el('strong', {}, `dépose déplacée au ${dateEnFrancais(decouper(deposeRetenue).date)} à ${decouper(deposeRetenue).heure}`))
+              : null),
         ));
-        const alternatives = propositionsAlternatives({
-          rdvCardio, materiels, appareils: etat.appareils, poses: posesActives(),
-          parametres: params, maintenant, maxPropositions: 4,
-        });
-        if (alternatives.length > 0) {
-          elements.push(el('h3', {}, 'Autres rendez-vous possibles'));
-          elements.push(el('div', { class: 'propositions' }, alternatives.map((prop) => {
-            const quand = decouper(prop.rdvCardio);
-            return el(
+      }
+      for (const pose of posesRendues) {
+        const retour = pose.retour_effectif || pose.fin;
+        lignesRecap.push(el(
+          'div',
+          { class: 'recap-ligne' },
+          etiquetteAppareil(appareilParId(pose.appareil_id)),
+          el('span', { class: 'aide' },
+            `Rendu le ${dateEnFrancais(decouper(retour).date)} à ${decouper(retour).heure} — inchangé.`),
+        ));
+      }
+
+      if (realisable) {
+        const depose = decouper(deposeRetenue);
+        elements.push(encart(
+          'succes',
+          el('strong', {}, '\u2714 Déplacement réalisable. '),
+          posesPosees.length > 0 || (plan && plan.lignes.length > 0)
+            ? `Dépose du matériel le ${dateEnFrancais(depose.date)} à ${depose.heure}.`
+            : 'Seule la date du rendez-vous cardiologue change.',
+        ));
+        if (plan) {
+          for (const ligne of plan.lignes) {
+            lignesRecap.push(el(
               'div',
-              { class: 'proposition' },
-              el('span', { class: 'proposition-date' }, `${dateEnFrancaisLong(quand.date)} à ${quand.heure}`),
-              el('button', {
-                class: 'bouton petit principal',
-                onclick: () => {
-                  saisie.date = quand.date;
-                  saisie.heure = quand.heure;
-                  champDate.value = quand.date;
-                  champHeure.value = quand.heure;
-                  recalculer();
-                },
-              }, 'Choisir'),
-            );
-          })));
+              { class: 'recap-ligne' },
+              etiquetteAppareil(ligne.appareil),
+              el('span', {},
+                el('strong', {}, `Pose ${dateEnFrancais(decouper(ligne.pose).date)} à ${decouper(ligne.pose).heure}`),
+                ` · dépose ${dateEnFrancais(decouper(ligne.depose).date)} à ${decouper(ligne.depose).heure}`),
+            ));
+          }
+        }
+        elements.push(el('div', { class: 'recap' }, lignesRecap));
+      } else {
+        if (lignesRecap.length > 0) elements.push(el('div', { class: 'recap' }, lignesRecap));
+        if (plan && !plan.possible) {
+          elements.push(encart(
+            'erreur',
+            el('strong', {}, '\u2716 Ce déplacement n\u2019est pas réalisable en l\u2019état.'),
+            el('ul', {}, plan.lignes
+              .filter((l) => l.motifEchec)
+              .map((l) => el('li', {}, l.motifEchec))),
+          ));
+          const alternatives = propositionsAlternatives({
+            rdvCardio, materiels, appareils: etat.appareils, poses: posesReference,
+            parametres: params, maintenant, maxPropositions: 4,
+          });
+          if (alternatives.length > 0) {
+            elements.push(el('h3', {}, 'Autres rendez-vous possibles'));
+            elements.push(el('div', { class: 'propositions' }, alternatives.map((prop) => {
+              const quand = decouper(prop.rdvCardio);
+              return el(
+                'div',
+                { class: 'proposition' },
+                el('span', { class: 'proposition-date' }, `${dateEnFrancaisLong(quand.date)} à ${quand.heure}`),
+                el('button', {
+                  class: 'bouton petit principal',
+                  onclick: () => {
+                    saisie.date = quand.date;
+                    saisie.heure = quand.heure;
+                    champDate.value = quand.date;
+                    champHeure.value = quand.heure;
+                    recalculer();
+                  },
+                }, 'Choisir'),
+              );
+            })));
+          }
         }
       }
 
@@ -300,65 +401,68 @@ function deplacer(rdv) {
       oninput: (e) => { saisie.heure = e.target.value; recalculer(); },
     });
 
-    const lignesMateriel = ['holter_ecg', 'mapa', 'polygraphie', 'spider'].map((categorie) => {
-      const m = saisie.materiels[categorie];
-      const case_ = el('input', {
-        type: 'checkbox', id: `dep-${categorie}`,
-        oninput: (e) => { m.actif = e.target.checked; recalculer(); },
+    const lignesMateriel = ['holter_ecg', 'mapa', 'polygraphie', 'spider']
+      .filter((categorie) => !categoriesFigees.has(categorie))
+      .map((categorie) => {
+        const m = saisie.materiels[categorie];
+        const case_ = el('input', {
+          type: 'checkbox', id: `dep-${categorie}`,
+          oninput: (e) => { m.actif = e.target.checked; recalculer(); },
+        });
+        case_.checked = m.actif;
+
+        const controles = [];
+        if (categorie === 'holter_ecg') {
+          controles.push(el('label', { class: 'aide paire' }, 'Marque :', selection(
+            [
+              { valeur: 'indifferent', libelle: 'Indifférente' },
+              { valeur: 'ELA', libelle: 'ELA' },
+              { valeur: 'DMS', libelle: 'DMS' },
+            ],
+            m.marque,
+            (v) => { m.marque = v; recalculer(); },
+            { style: 'width:auto' },
+          )));
+        }
+        const durees = dureesAutorisees(categorie);
+        if (durees.length > 1) {
+          controles.push(el('label', { class: 'aide paire' }, 'Durée :', selection(
+            durees.map((d) => ({ valeur: d, libelle: dureeLisible(d) })),
+            m.duree,
+            (v) => { m.duree = Number(v); recalculer(); },
+            { style: 'width:auto' },
+          )));
+        } else {
+          controles.push(el('span', { class: 'aide' }, `Durée : ${dureeLisible(durees[0])}`));
+        }
+
+        return el(
+          'div',
+          { class: 'recap-ligne' },
+          case_,
+          el('label', { for: `dep-${categorie}`, style: 'font-weight:700;cursor:pointer' },
+            CATEGORIES[categorie].libelle),
+          el('span', { class: 'espace' }),
+          ...controles,
+        );
       });
-      case_.checked = m.actif;
-
-      const controles = [];
-      if (categorie === 'holter_ecg') {
-        controles.push(el('label', { class: 'aide paire' }, 'Marque :', selection(
-          [
-            { valeur: 'indifferent', libelle: 'Indifférente' },
-            { valeur: 'ELA', libelle: 'ELA' },
-            { valeur: 'DMS', libelle: 'DMS' },
-          ],
-          m.marque,
-          (v) => { m.marque = v; recalculer(); },
-          { style: 'width:auto' },
-        )));
-      }
-      const durees = dureesAutorisees(categorie);
-      if (durees.length > 1) {
-        controles.push(el('label', { class: 'aide paire' }, 'Durée :', selection(
-          durees.map((d) => ({ valeur: d, libelle: dureeLisible(d) })),
-          m.duree,
-          (v) => { m.duree = Number(v); recalculer(); },
-          { style: 'width:auto' },
-        )));
-      } else {
-        controles.push(el('span', { class: 'aide' }, `Durée : ${dureeLisible(durees[0])}`));
-      }
-
-      return el(
-        'div',
-        { class: 'recap-ligne' },
-        case_,
-        el('label', { for: `dep-${categorie}`, style: 'font-weight:700;cursor:pointer' },
-          CATEGORIES[categorie].libelle),
-        el('span', { class: 'espace' }),
-        ...controles,
-      );
-    });
 
     boutonEnregistrer.addEventListener('click', async () => {
-      if (!plan?.possible) return;
+      if (!realisable) return;
       boutonEnregistrer.disabled = true;
       boutonEnregistrer.textContent = 'Enregistrement…';
       try {
         await api.deplacerRendezVous(
           rdv.id,
           horodatage(saisie.date, saisie.heure),
-          plan.lignes.map((l) => ({
+          (plan ? plan.lignes : []).map((l) => ({
             appareil_id: l.appareil.id,
             duree_heures: l.demande.dureeHeures,
             marque_demandee: l.demande.marque && l.demande.marque !== 'indifferent' ? l.demande.marque : null,
             debut: l.pose,
             fin: l.depose,
           })),
+          posesPosees.length > 0 ? deposeRetenue : null,
         );
         fermer();
         notifier(`Rendez-vous de ${nomPatient(rdv)} déplacé.`, 'succes');
@@ -378,16 +482,19 @@ function deplacer(rdv) {
     return [
       el('h2', {}, `Déplacer le rendez-vous de ${nomPatient(rdv)}`),
       el('p', { class: 'aide', style: 'margin-top:0' },
-        'Changez la date, l’heure ou le matériel : le logiciel recalcule la pose et '
-        + 'réattribue les appareils. L’ancien créneau est libéré automatiquement.'),
+        posesPosees.length > 0
+          ? 'Le matériel déjà posé garde son appareil et sa date de pose : seule la dépose '
+            + 'suit le nouveau rendez-vous. Le reste est recalculé automatiquement.'
+          : 'Changez la date, l\u2019heure ou le matériel : le logiciel recalcule la pose et '
+            + 'réattribue les appareils. L\u2019ancien créneau est libéré automatiquement.'),
       el(
         'div',
         { class: 'grille' },
         champ('Date du rendez-vous cardiologue', champDate),
         champ('Heure du rendez-vous', champHeure),
       ),
-      el('h3', {}, 'Matériel à poser'),
-      el('div', { class: 'recap' }, lignesMateriel),
+      lignesMateriel.length > 0 ? el('h3', {}, 'Matériel à poser') : null,
+      lignesMateriel.length > 0 ? el('div', { class: 'recap' }, lignesMateriel) : null,
       zoneResultat,
       el(
         'div',

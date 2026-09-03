@@ -35,6 +35,7 @@ const base = {
   appareils: INVENTAIRE_INITIAL.map((a) => ({ ...a, id: identifiant('app'), actif: true })),
   rendez_vous: [],
   poses: [],
+  rappels: [],
   parametres: [
     {
       cle: 'planification',
@@ -51,7 +52,7 @@ const base = {
     { cle: 'horaires', valeur: HORAIRES_PAR_DEFAUT },
     { cle: 'cardiologues', valeur: CARDIOS },
     { cle: 'sauvegarde', valeur: { destinataires: ['secretariat@exemple.fr'], frequence: 'quotidien', joursConservation: 7 } },
-    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.1.0' } },
+    { cle: 'cabinet', valeur: { nom: 'Cabinet de démonstration', version: '1.3.0' } },
   ],
 };
 
@@ -304,16 +305,26 @@ const fonctions = {
     return { id: rdv.id, appareils: p_lignes.length };
   },
 
-  deplacer_rendez_vous({ p_rdv_id, p_rdv_cardio, p_lignes }) {
+  deplacer_rendez_vous({ p_rdv_id, p_rdv_cardio, p_lignes, p_nouvelle_depose = null }) {
     const rdv = base.rendez_vous.find((r) => r.id === p_rdv_id);
     if (!rdv) throw new Error('RDV_INTROUVABLE: ce rendez-vous n’existe plus.');
     if (rdv.statut === 'annule') throw new Error('RDV_ANNULE: un rendez-vous annulé ne peut pas être déplacé.');
-    if (base.poses.some((p) => p.rdv_id === p_rdv_id && ['pose', 'rendu'].includes(p.statut))) {
-      throw new Error('MATERIEL_DEJA_POSE: le matériel de ce rendez-vous est déjà posé.');
+
+    const figees = base.poses.filter((p) => p.rdv_id === p_rdv_id && ['pose', 'rendu'].includes(p.statut));
+    if (figees.length === 0 && !p_lignes.length) {
+      throw new Error('AUCUN_MATERIEL: sélectionnez au moins un matériel à poser.');
     }
-    if (!p_lignes.length) throw new Error('AUCUN_MATERIEL: sélectionnez au moins un matériel à poser.');
 
     verifierLignes(p_lignes, p_rdv_id);
+
+    // Matériel déjà posé : l'appareil et la pose ne bougent pas,
+    // la dépose est déplacée avec le rendez-vous.
+    if (p_nouvelle_depose) {
+      if (figees.some((p) => p.statut === 'pose' && p.debut >= p_nouvelle_depose)) {
+        throw new Error('DEPOSE_TROP_TOT: la nouvelle dépose précéderait la pose du matériel.');
+      }
+      for (const p of figees) if (p.statut === 'pose') p.fin = p_nouvelle_depose;
+    }
 
     rdv.rdv_cardio = p_rdv_cardio;
     for (const p of base.poses) if (p.rdv_id === p_rdv_id && p.statut === 'prevu') p.statut = 'annule';
@@ -359,6 +370,39 @@ const fonctions = {
     ));
     if (conflit) throw new Error('CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.');
     pose.appareil_id = p_appareil_id;
+    diffuser();
+    return null;
+  },
+
+  changer_appareils({ p_changements }) {
+    for (const chg of p_changements) {
+      const pose = base.poses.find((p) => p.id === chg.pose_id);
+      if (!pose) throw new Error('RDV_INTROUVABLE: cette pose n’existe plus.');
+      const conflit = base.poses.some((p) => (
+        p.id !== pose.id && p.appareil_id === chg.appareil_id && p.statut !== 'annule'
+        && chevauchement(pose.debut, pose.fin, p.debut, p.retour_effectif || p.fin)
+        && !p_changements.some((c) => c.pose_id === p.id) // celui-ci va bouger aussi
+      ));
+      if (conflit) throw new Error('CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.');
+      pose.appareil_id = chg.appareil_id;
+    }
+    diffuser();
+    return { changements: p_changements.length };
+  },
+
+  reattribuer_pose({ p_pose_id, p_appareil_id, p_debut }) {
+    const pose = base.poses.find((p) => p.id === p_pose_id);
+    if (!pose) throw new Error('RDV_INTROUVABLE: cette pose n’existe plus.');
+    if (pose.statut !== 'prevu') {
+      throw new Error('MATERIEL_DEJA_POSE: cette pose n’est plus modifiable.');
+    }
+    const conflit = base.poses.some((p) => (
+      p.id !== pose.id && p.appareil_id === p_appareil_id && p.statut !== 'annule'
+      && chevauchement(p_debut, pose.fin, p.debut, p.retour_effectif || p.fin)
+    ));
+    if (conflit) throw new Error('CONFLIT_APPAREIL: cet appareil est déjà pris sur cette période.');
+    pose.appareil_id = p_appareil_id;
+    pose.debut = p_debut;
     diffuser();
     return null;
   },

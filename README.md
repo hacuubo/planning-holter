@@ -72,7 +72,14 @@ rendez-vous (autre date, autre heure, autre matériel — changer le type de
 Holter par exemple) ou l'annuler ; le matériel est aussitôt libéré.
 
 **Onglet Calendrier** — une vue d'ensemble : le matériel en lignes, les jours en
-colonnes, un trait coloré sur chaque journée où l'appareil est chez un patient.
+colonnes (de 3 à 120 jours), un trait coloré sur chaque journée où l'appareil est
+chez un patient, avec les heures de pose et de dépose en vue rapprochée. La
+légende filtre par type de matériel, et le numéro d'appareil se corrige d'un clic
+le jour de la pose, avec réattribution automatique du patient qui le réservait.
+
+**Onglet Alertes** — les réservations posées sur un appareil en panne (avec
+réattribution automatique au plus près de 24 h de port) et les patients à
+rappeler quand un horaire de pose a changé.
 
 **Onglet Réglages** — parc matériel (ajout, retrait avec réattribution
 automatique des patients concernés), horaires, nombre de poses par quart

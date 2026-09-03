@@ -44,10 +44,11 @@ alter table public.rendez_vous enable row level security;
 alter table public.poses       enable row level security;
 alter table public.parametres  enable row level security;
 alter table public.journal     enable row level security;
+alter table public.rappels     enable row level security;
 
 -- Les visiteurs non connectés n'ont strictement aucun droit.
 revoke all on public.profils, public.appareils, public.rendez_vous,
-              public.poses, public.parametres, public.journal from anon;
+              public.poses, public.parametres, public.journal, public.rappels from anon;
 
 -- -----------------------------------------------------------------------------
 -- Profils
@@ -166,3 +167,23 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.creer_profil_a_l_inscription();
+
+-- -----------------------------------------------------------------------------
+-- Rappels téléphoniques : toutes les secrétaires les voient et les cochent
+-- -----------------------------------------------------------------------------
+drop policy if exists rappels_lecture on public.rappels;
+create policy rappels_lecture on public.rappels
+  for select to authenticated using (public.est_actif());
+
+drop policy if exists rappels_creation on public.rappels;
+create policy rappels_creation on public.rappels
+  for insert to authenticated with check (public.est_actif());
+
+drop policy if exists rappels_modification on public.rappels;
+create policy rappels_modification on public.rappels
+  for update to authenticated
+  using (public.est_actif()) with check (public.est_actif());
+
+drop policy if exists rappels_suppression on public.rappels;
+create policy rappels_suppression on public.rappels
+  for delete to authenticated using (public.est_admin());

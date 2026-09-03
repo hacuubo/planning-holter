@@ -139,7 +139,14 @@ toujours quelle version tourne au cabinet.
 | Version | Date | Contenu |
 |---------|------|---------|
 | 1.0.0 | mise en service initiale | planning, prise de rendez-vous, recherche, calendrier, réglages, statistiques, sauvegardes quotidiennes |
+| 1.3.0 | septembre 2026 | onglet Alertes (réattributions automatiques après panne, patients à rappeler) ; mise hors service temporaire d'un appareil ; correction du numéro d'appareil depuis le calendrier avec réattribution en cascade ; calendrier : vue 3 jours, filtre par type, heures de pose/dépose sur les traits ; Journée : colonnes Poses et Déposes — rejouer `supabase/06-mise-a-jour-1-3.sql` PUIS `supabase/03-fonctions.sql` dans Supabase |
+| 1.2.0 | septembre 2026 | déplacement possible même quand le matériel est posé ou rendu (la dépose suit le rendez-vous, l'appareil ne change pas) ; calendrier : le trait couvre aussi la veille de la pose (trois jours pour un Holter 24 h, jour de pose au milieu) — rejouer `supabase/03-fonctions.sql` dans Supabase après la mise à jour |
 | 1.1.0 | août 2026 | déplacement / modification d'un rendez-vous depuis la Recherche ; plages de rendez-vous matin et après-midi ; règles de la polygraphie (pose la veille après-midi jusqu'à 17h15 — 16h45 le vendredi —, dépose le lendemain matin, une seule nuit) ; 1 pose par quart d'heure et déposes illimitées ; dépose 15 minutes avant le rendez-vous |
+
+**Mise à jour 1.3.0 — à faire une fois dans Supabase.** Ouvrez Supabase ▸
+**SQL Editor** et jouez, dans cet ordre : 1) `supabase/06-mise-a-jour-1-3.sql`
+(colonne « hors service » et table des rappels — aucune donnée existante n'est
+touchée), puis 2) `supabase/03-fonctions.sql` (nouvelles fonctions). C'est tout.
 
 **Mise à jour 1.1.0 — à faire une fois dans Supabase.** Cette version touche
 aussi la base (une nouvelle fonction et des règles de contrôle) : après avoir
