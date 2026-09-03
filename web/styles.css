@@ -356,6 +356,9 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
   width: 132px; min-width: 132px; max-width: 132px;
 }
 .calendrier td.jour { height: 26px; position: relative; }
+/* Case libre cliquable : un clic propose une pose de cet appareil ce jour-là */
+.calendrier td.reservable { cursor: pointer; }
+.calendrier td.reservable:hover { box-shadow: inset 0 0 0 2px var(--primaire); background: var(--primaire-clair); }
 .calendrier td.week-end { background: var(--fond); }
 .calendrier td.ferie { background: var(--alerte-clair); }
 .calendrier td.aujourdhui { box-shadow: inset 0 0 0 2px var(--primaire); }

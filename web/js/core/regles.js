@@ -18,7 +18,7 @@
 import {
   ajouterJours, creneauxDuJour, decaler, ecartJours, estJourOuvre,
   horairesDuJour, horodatage, horodatageEnMinutes, decouper, listeCreneaux,
-  minutes, normaliserHorodatage, PAS_CRENEAU_MINUTES,
+  minutes, minutesEnHorodatage, normaliserHorodatage, PAS_CRENEAU_MINUTES,
 } from './dates.js';
 
 /** Minuit + 12 h : sépare les plages du matin de celles de l'après-midi. */
@@ -775,4 +775,112 @@ export function propositionReattribution({ pose, appareil, appareils, poses, par
     }
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// 9. Rendez-vous pris directement depuis le calendrier (appareil + jour choisis)
+// ---------------------------------------------------------------------------
+
+/**
+ * La secrétaire clique sur une case du calendrier : un APPAREIL précis, un
+ * JOUR précis, puis choisit l'heure de pose et la durée. On remonte alors le
+ * fil dans l'autre sens : la dépose est le premier créneau atteignable après
+ * la durée de port (à la tolérance près), et le rendez-vous cardiologue est
+ * placé juste après la dépose.
+ *
+ * @returns {{possible: boolean, pose: string|null, depose: string|null,
+ *            rdvCardio: string|null, dureeReelleMinutes: number|null,
+ *            avertissements: string[], motif: string|null}}
+ */
+export function proposerRdvDepuisPose({
+  appareil, date, heure, dureeHeures, poses, parametres = {}, maintenant = null,
+}) {
+  const p = fusionnerParametres(parametres);
+  const refus = (motif) => ({
+    possible: false, pose: null, depose: null, rdvCardio: null,
+    dureeReelleMinutes: null, avertissements: [], motif,
+  });
+
+  if (appareilIndisponible(appareil)) {
+    return refus('Cet appareil est hors service ou retiré du parc.');
+  }
+
+  const duree = dureeHeures || 24;
+  const poseTs = horodatage(date, heure);
+
+  if (!creneauxPoseDuJour(date, appareil.categorie, p).includes(heure)) {
+    return refus(appareil.categorie === 'polygraphie'
+      ? 'Les polygraphies se posent l’après-midi uniquement.'
+      : 'Cette heure ne correspond à aucun créneau d’ouverture ce jour-là.');
+  }
+  if (maintenant && horodatageEnMinutes(poseTs) < horodatageEnMinutes(maintenant)) {
+    return refus('Ce créneau de pose est déjà passé.');
+  }
+  if (creneauSature(chargeDesCreneaux(poses), poseTs, p)) {
+    return refus(`Le créneau de pose de ${heure} est déjà pris `
+      + `(${p.posesParCreneau} pose(s) maximum par quart d'heure).`);
+  }
+
+  // Recherche de la dépose.
+  let depose = null;
+  if (appareil.categorie === 'polygraphie') {
+    // Une seule nuit : dépose le lendemain matin, au dernier créneau du matin
+    // (le port se rapproche ainsi au mieux des 24 h).
+    const lendemain = ajouterJours(date, 1);
+    const matins = creneauxDuJour(lendemain, p).filter((h) => minutes(h) < MIDI_MINUTES);
+    if (matins.length === 0) {
+      return refus('Le lendemain est fermé : impossible de déposer la polygraphie le matin suivant.');
+    }
+    depose = horodatage(lendemain, matins[matins.length - 1]);
+  } else {
+    // Créneau de dépose LE PLUS PROCHE de « pose + durée ». On accepte un
+    // port sensiblement plus court (jusqu'à la moitié de la durée nominale) :
+    // une pose du vendredi après-midi se dépose le samedi matin plutôt que
+    // le lundi, quitte à porter moins de 24 h — un avertissement le signale.
+    const ideal = horodatageEnMinutes(poseTs) + duree * 60;
+    const plancher = ideal - Math.max(p.toleranceDureeMinutes, (duree * 60) / 2);
+    let meilleur = null;
+    let jour = decouper(minutesEnHorodatage(plancher)).date;
+    for (let i = 0; i < 15 && !(meilleur && meilleur.apresIdeal); i++) {
+      for (const h of creneauxDuJour(jour, p)) {
+        const m = horodatageEnMinutes(horodatage(jour, h));
+        if (m < plancher) continue;
+        const ecart = Math.abs(m - ideal);
+        if (!meilleur || ecart < meilleur.ecart) {
+          meilleur = { ts: horodatage(jour, h), ecart, apresIdeal: m >= ideal };
+        }
+        if (m >= ideal) { meilleur.apresIdeal = true; break; }
+      }
+      jour = ajouterJours(jour, 1);
+    }
+    if (!meilleur) return refus('Aucun créneau de dépose trouvé après la durée de port.');
+    depose = meilleur.ts;
+  }
+
+  const avertissements = [];
+  const dureeReelleMinutes = horodatageEnMinutes(depose) - horodatageEnMinutes(poseTs);
+  if (appareil.categorie !== 'polygraphie'
+      && Math.abs(dureeReelleMinutes - duree * 60) > p.toleranceDureeMinutes) {
+    const heures = Math.round(dureeReelleMinutes / 60);
+    avertissements.push(`Port réel de ${heures} h au lieu de ${duree} h `
+      + '(week-end ou fermeture entre la pose et la dépose).');
+  }
+  if (appareil.urgence) {
+    avertissements.push('Cet appareil est réservé aux urgences : il ne sera plus disponible '
+      + 'pour un imprévu pendant toute la période.');
+  }
+  if (appareilOccupe(appareil.id, poses, poseTs, depose, p)) {
+    return refus(`L'appareil ${appareil.code} est déjà réservé sur cette période `
+      + '(de la pose au retour). Choisissez une autre ligne ou une autre date.');
+  }
+
+  return {
+    possible: true,
+    pose: poseTs,
+    depose,
+    rdvCardio: decaler(depose, p.minutesAvantRdvCardio),
+    dureeReelleMinutes,
+    avertissements,
+    motif: null,
+  };
 }

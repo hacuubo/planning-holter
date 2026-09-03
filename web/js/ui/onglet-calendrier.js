@@ -8,15 +8,24 @@
 
 import {
   ajouterJours, aujourdHui, dateEnFrancais, dateEnFrancaisLong, decouper,
-  ecartJours, estFerie, jourSemaine, nomJourFerie,
+  ecartJours, estFerie, estJourOuvre, jourSemaine, maintenantHorodatage,
+  nomJourFerie,
 } from '../core/dates.js';
-import { CATEGORIES, dureeLisible, libelleAppareil, libelleCourt } from '../core/materiel.js';
-import { planChangementAppareil } from '../core/regles.js';
-import * as api from '../data/api.js';
-import { appareilsActifs, etat, parametres, posesActives, rafraichir } from '../data/etat.js';
 import {
-  carte, classeMateriel, el, etiquetteAppareil, messageVide, nomPatient,
-  notifier, notifierErreur, ouvrirFenetre, remplir, sexeLisible,
+  CATEGORIES, dureeLisible, dureeParDefaut, dureesAutorisees, libelleAppareil,
+  libelleCourt,
+} from '../core/materiel.js';
+import {
+  chargeDesCreneaux, creneauSature, creneauxPoseDuJour, planChangementAppareil,
+  proposerRdvDepuisPose,
+} from '../core/regles.js';
+import * as api from '../data/api.js';
+import {
+  appareilsActifs, cardiologues, etat, parametres, posesActives, rafraichir,
+} from '../data/etat.js';
+import {
+  carte, champ, classeMateriel, el, etiquetteAppareil, messageVide, nomPatient,
+  notifier, notifierErreur, ouvrirFenetre, remplir, selection, sexeLisible,
 } from './base.js';
 
 const INITIALES_JOURS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
@@ -25,7 +34,7 @@ const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
 
 /** Premier jour affiché et largeur de la fenêtre, en jours. */
 let debutFenetre = ajouterJours(aujourdHui(), -7);
-let largeur = 60;
+let largeur = 30;
 
 /** Types de matériel masqués d'un clic sur la légende (clé catégorie|marque). */
 const typesMasques = new Set();
@@ -66,7 +75,7 @@ export function afficherCalendrier(conteneur) {
           if (largeur <= 7) debutFenetre = ajouterJours(aujourdHui(), -1);
           redessiner();
         },
-      }, [3, 30, 60, 90, 120].map((n) => {
+      }, [3, 30].map((n) => {
         const o = el('option', { value: n }, `${n} jours`);
         if (n === largeur) o.selected = true;
         return o;
@@ -203,7 +212,16 @@ function tableauCalendrier() {
         ecartJours(decouper(p.debut).date, jour) >= 0
         && ecartJours(jour, decouper(p.fin).date) >= 0
       )) || posesAppareil.find((p) => ajouterJours(decouper(p.debut).date, -1) === jour);
-      if (pose) td.append(traitDePose(pose, jour, appareil));
+      if (pose) {
+        td.append(traitDePose(pose, jour, appareil));
+      } else if (jour >= today && estJourOuvre(jour, params)
+        && appareil.actif !== false && appareil.hors_service !== true) {
+        // Case libre d'un jour ouvré à venir : un clic propose une pose de
+        // cet appareil précis ce jour-là.
+        td.classList.add('reservable');
+        td.title = `Poser ${libelleAppareil(appareil)} le ${dateEnFrancais(jour)} — cliquez`;
+        td.addEventListener('click', () => nouveauRdvDepuisCase(appareil, jour));
+      }
       return td;
     });
 
@@ -307,6 +325,186 @@ function detailPose(pose, appareil) {
         : null,
       el('button', { class: 'bouton principal', onclick: fermer }, 'Fermer')),
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// Prise de rendez-vous directement depuis une case du calendrier
+// ---------------------------------------------------------------------------
+
+/**
+ * La secrétaire a cliqué sur la ligne d'un appareil, au niveau d'une journée
+ * libre : elle choisit l'heure de pose, le nom du patient et la durée (fixe
+ * pour les MAPA, polygraphies et Spider Flash ; 24/48/72 h pour les Holter).
+ * La dépose et le rendez-vous cardiologue sont déduits automatiquement.
+ */
+function nouveauRdvDepuisCase(appareil, jour) {
+  const params = parametres();
+  const maintenant = maintenantHorodatage();
+  const charge = chargeDesCreneaux(posesActives());
+
+  // Créneaux de pose encore possibles ce jour-là pour cette catégorie.
+  const heures = creneauxPoseDuJour(jour, appareil.categorie, params)
+    .filter((h) => `${jour} ${h}` >= maintenant)
+    .filter((h) => !creneauSature(charge, `${jour} ${h}`, params));
+
+  if (heures.length === 0) {
+    ouvrirFenetre((fermer) => [
+      el('h2', {}, '⚠ Aucun créneau de pose'),
+      el('p', {}, `Tous les créneaux de pose du ${dateEnFrancaisLong(jour)} sont passés ou complets`
+        + (appareil.categorie === 'polygraphie' ? ' (les polygraphies se posent l’après-midi uniquement).' : '.')),
+      el('div', { class: 'fenetre-actions' },
+        el('button', { class: 'bouton principal', onclick: fermer }, 'Fermer')),
+    ]);
+    return;
+  }
+
+  const durees = dureesAutorisees(appareil.categorie);
+  const saisie = {
+    heure: heures[0],
+    duree: dureeParDefaut(appareil.categorie),
+    nom: '',
+    sexe: '',
+    cardiologue: cardiologues()[0] || '',
+  };
+  let proposition = null;
+
+  ouvrirFenetre((fermer) => {
+    const zoneResultat = el('div', {});
+    const boutonValider = el('button', { class: 'bouton principal', disabled: true }, 'Enregistrer le rendez-vous');
+
+    const majBouton = () => {
+      boutonValider.disabled = !(proposition?.possible
+        && saisie.nom.trim().length > 0
+        && (saisie.sexe === 'F' || saisie.sexe === 'M'));
+    };
+
+    const recalculer = () => {
+      proposition = proposerRdvDepuisPose({
+        appareil,
+        date: jour,
+        heure: saisie.heure,
+        dureeHeures: saisie.duree,
+        poses: posesActives(),
+        parametres: params,
+        maintenant,
+      });
+
+      const elements = proposition.avertissements.map((a) => el('div', { class: 'encart alerte' }, `⚠ ${a}`));
+      if (!proposition.possible) {
+        elements.push(el('div', { class: 'encart erreur' }, el('strong', {}, '✖ '), proposition.motif));
+      } else {
+        const d = decouper(proposition.depose);
+        const r = decouper(proposition.rdvCardio);
+        elements.push(el(
+          'div',
+          { class: 'encart succes' },
+          el('strong', {}, '✔ '),
+          `Pose le ${dateEnFrancais(jour)} à ${saisie.heure} · `,
+          el('strong', {}, `dépose le ${dateEnFrancais(d.date)} à ${d.heure}`),
+          ` · rendez-vous cardiologue le ${dateEnFrancais(r.date)} à ${r.heure}.`,
+        ));
+      }
+      remplir(zoneResultat, ...elements);
+      majBouton();
+    };
+
+    const choixSexe = el('div', { class: 'choix-sexe', role: 'radiogroup', 'aria-label': 'Sexe du patient' });
+    for (const [valeur, libelle] of [['F', 'Femme'], ['M', 'Homme']]) {
+      const bouton = el('button', {
+        type: 'button', class: 'bouton',
+        onclick: () => {
+          saisie.sexe = valeur;
+          for (const autre of choixSexe.children) {
+            autre.className = `bouton${autre.dataset.valeur === valeur ? ' principal' : ''}`;
+          }
+          majBouton();
+        },
+      }, libelle);
+      bouton.dataset.valeur = valeur;
+      choixSexe.append(bouton);
+    }
+
+    boutonValider.addEventListener('click', async () => {
+      if (boutonValider.disabled) return;
+      boutonValider.disabled = true;
+      boutonValider.textContent = 'Enregistrement…';
+      try {
+        await api.reserverRendezVous(
+          {
+            patient_nom: saisie.nom.trim(),
+            patient_sexe: saisie.sexe,
+            cardiologue: saisie.cardiologue,
+            rdv_cardio: proposition.rdvCardio,
+            telephone: null,
+            commentaire: null,
+          },
+          [{
+            appareil_id: appareil.id,
+            duree_heures: saisie.duree,
+            marque_demandee: appareil.marque || null,
+            debut: proposition.pose,
+            fin: proposition.depose,
+          }],
+        );
+        fermer();
+        notifier(`Rendez-vous enregistré pour ${saisie.nom.trim().toUpperCase()} `
+          + `(${libelleAppareil(appareil)}).`, 'succes');
+        await rafraichir();
+        redessiner();
+      } catch (erreur) {
+        fermer();
+        notifierErreur(erreur);
+        await rafraichir().catch(() => {});
+        redessiner();
+      }
+    });
+
+    recalculer();
+
+    return [
+      el('h2', {}, `Nouveau rendez-vous — ${dateEnFrancaisLong(jour)}`),
+      el(
+        'div',
+        { class: 'recap', style: 'margin-bottom:.8rem' },
+        el('div', { class: 'recap-ligne' },
+          etiquetteAppareil(appareil),
+          el('span', { class: 'aide' }, 'appareil choisi sur le calendrier')),
+      ),
+      el(
+        'div',
+        { class: 'grille' },
+        champ('Heure de pose', selection(
+          heures.map((h) => ({ valeur: h, libelle: h })),
+          saisie.heure,
+          (v) => { saisie.heure = v; recalculer(); },
+        )),
+        durees.length > 1
+          ? champ('Durée du Holter', selection(
+            durees.map((d) => ({ valeur: d, libelle: dureeLisible(d) })),
+            saisie.duree,
+            (v) => { saisie.duree = Number(v); recalculer(); },
+          ))
+          : champ('Durée', el('input', { type: 'text', value: dureeLisible(durees[0]), disabled: true })),
+        champ('Nom de famille', el('input', {
+          type: 'text', placeholder: 'DUPONT', autocomplete: 'off',
+          oninput: (e) => { saisie.nom = e.target.value; majBouton(); },
+        })),
+        champ('Sexe', choixSexe),
+        champ('Cardiologue demandeur', selection(
+          cardiologues().map((c) => ({ valeur: c, libelle: c })),
+          saisie.cardiologue,
+          (v) => { saisie.cardiologue = v; },
+        )),
+      ),
+      zoneResultat,
+      el(
+        'div',
+        { class: 'fenetre-actions' },
+        el('button', { class: 'bouton', onclick: fermer }, 'Annuler'),
+        boutonValider,
+      ),
+    ];
+  });
 }
 
 // ---------------------------------------------------------------------------

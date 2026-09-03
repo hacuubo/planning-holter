@@ -4,7 +4,8 @@ import {
   appareilOccupe, appareilsLibres, chargeDesCreneaux, chevauche, choisirAppareil,
   creneauDepose, creneauSature, creneauxPoseCandidats, creneauxPoseDuJour,
   disponibilitesParType, placesRestantes, planChangementAppareil, planifier,
-  poseIdeale, propositionReattribution, propositionsAlternatives,
+  poseIdeale, propositionReattribution, proposerRdvDepuisPose,
+  propositionsAlternatives,
 } from '../web/js/core/regles.js';
 import { INVENTAIRE_INITIAL } from '../web/js/core/materiel.js';
 import { ajouterJours, decouper } from '../web/js/core/dates.js';
@@ -692,4 +693,80 @@ test('réattribution après panne : null quand rien n’est possible', () => {
     pose: p1, appareil: n1, appareils, poses: [p1, ...occupations],
   });
   assert.equal(prop, null);
+});
+
+// ---------------------------------------------------------------------------
+// Rendez-vous pris depuis une case du calendrier (appareil + jour choisis)
+// ---------------------------------------------------------------------------
+
+test('clic calendrier : Holter 24 h posé mardi matin -> dépose mercredi à la même heure', () => {
+  const r = proposerRdvDepuisPose({
+    appareil: parCode('1', 'DMS'), date: '2026-08-25', heure: '09:45',
+    dureeHeures: 24, poses: [],
+  });
+  assert.ok(r.possible);
+  assert.equal(r.pose, '2026-08-25 09:45');
+  assert.equal(r.depose, '2026-08-26 09:45'); // le créneau le plus proche de 24 h
+  assert.equal(r.rdvCardio, '2026-08-26 10:00'); // dépose + 15 minutes
+  assert.equal(r.dureeReelleMinutes, 1440);
+  assert.equal(r.avertissements.length, 0);
+});
+
+test('clic calendrier : pose le vendredi après-midi -> dépose samedi matin, port plus court signalé', () => {
+  const r = proposerRdvDepuisPose({
+    appareil: parCode('A'), date: '2026-08-21', heure: '15:00', // vendredi
+    dureeHeures: 24, poses: [],
+  });
+  assert.ok(r.possible);
+  assert.equal(r.depose, '2026-08-22 11:45'); // samedi 11:45, plus proche que lundi
+  assert.ok(r.avertissements.some((a) => /au lieu de 24/.test(a)));
+});
+
+test('clic calendrier : polygraphie posée l’après-midi, déposée le lendemain matin', () => {
+  const r = proposerRdvDepuisPose({
+    appareil: parCode('N1'), date: '2026-08-24', heure: '17:15', // lundi, plage prolongée
+    dureeHeures: 24, poses: [],
+  });
+  assert.ok(r.possible);
+  assert.equal(r.depose, '2026-08-25 11:30'); // dernier créneau du matin
+  assert.equal(r.rdvCardio, '2026-08-25 11:45');
+});
+
+test('clic calendrier : polygraphie le matin refusée', () => {
+  const r = proposerRdvDepuisPose({
+    appareil: parCode('N1'), date: '2026-08-24', heure: '09:45',
+    dureeHeures: 24, poses: [],
+  });
+  assert.ok(!r.possible);
+  assert.match(r.motif, /après-midi/);
+});
+
+test('clic calendrier : appareil déjà réservé sur la période -> refus', () => {
+  const dms1 = parCode('1', 'DMS');
+  const occupation = pose(dms1, '2026-08-25 14:00', '2026-08-26 09:00', { rdv_id: 'r1' });
+  const r = proposerRdvDepuisPose({
+    appareil: dms1, date: '2026-08-25', heure: '09:45',
+    dureeHeures: 24, poses: [occupation],
+  });
+  assert.ok(!r.possible);
+  assert.match(r.motif, /déjà réservé/);
+});
+
+test('clic calendrier : créneau de pose complet -> refus', () => {
+  const autre = pose(parCode('2', 'DMS'), '2026-08-25 09:45', '2026-08-26 09:45', { rdv_id: 'r1' });
+  const r = proposerRdvDepuisPose({
+    appareil: parCode('1', 'DMS'), date: '2026-08-25', heure: '09:45',
+    dureeHeures: 24, poses: [autre],
+  });
+  assert.ok(!r.possible);
+  assert.match(r.motif, /déjà pris/);
+});
+
+test('clic calendrier : appareil d’urgence accepté avec avertissement', () => {
+  const r = proposerRdvDepuisPose({
+    appareil: parCode('101', 'DMS'), date: '2026-08-25', heure: '09:45',
+    dureeHeures: 24, poses: [],
+  });
+  assert.ok(r.possible);
+  assert.ok(r.avertissements.some((a) => /urgences/.test(a)));
 });

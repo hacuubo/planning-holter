@@ -141,14 +141,24 @@ où s'inscrit le nom du patient, et le **jour de dépose**. Les examens plus
 longs (48 h, 72 h, Spider Flash) s'étendent d'autant. Cliquez sur un trait pour
 voir le patient concerné.
 
-Les boutons du haut font défiler la période ; la liste déroulante permet
-d'afficher de **3** à 120 jours d'un coup. En vue **3 jours**, chaque trait
+Les boutons du haut font défiler la période ; la liste déroulante propose
+deux vues : **30 jours** (vue d'ensemble) et **3 jours** (vue rapprochée,
+navigation par pas de 3 jours). En vue **3 jours**, chaque trait
 affiche l'**heure de pose à gauche**, le **nom du patient** au milieu et
 l'**heure de dépose à droite**.
 
 **Filtrer par type** — cliquez sur un type dans la légende (Holter DMS,
 Holter ELA, MAPA…) pour le masquer et alléger le tableau ; un second clic
 (ou « Tout afficher ») le réaffiche.
+
+**Prendre un rendez-vous d'un clic** — cliquez sur une **case libre** de la
+ligne d'un appareil, au niveau d'une journée : choisissez l'heure de pose, le
+nom du patient, le sexe, le cardiologue et la durée (fixe pour les MAPA,
+polygraphies et Spider Flash ; 24, 48 ou 72 h pour les Holter). La **dépose**
+et le **rendez-vous cardiologue** sont déduits automatiquement — au créneau le
+plus proche de la durée de port, quitte à raccourcir un peu le port quand un
+week-end s'interpose (un avertissement le signale). Les cases se colorent au
+survol ; une case occupée, passée ou un jour fermé ne réagit pas.
 
 **Corriger un numéro d'appareil** — si le mauvais appareil a été posé,
 cliquez sur le trait puis « Changer d'appareil » et choisissez l'appareil
