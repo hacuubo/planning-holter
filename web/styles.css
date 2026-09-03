@@ -26,10 +26,10 @@
   --holter-dms-fond: #dbeafe;
   --holter-ela: #1d4ed8;
   --holter-ela-fond: #e0f2fe;
-  --mapa: #6d28d9;
-  --mapa-fond: #ede9fe;
-  --polygraphie: #0f766e;
-  --polygraphie-fond: #ccfbf1;
+  --mapa: #dc2626;             /* rouge : se distingue franchement des Holter bleus */
+  --mapa-fond: #fee2e2;
+  --polygraphie: #15803d;      /* vert franc */
+  --polygraphie-fond: #dcfce7;
   --spider: #c2410c;
   --spider-fond: #ffedd5;
 
@@ -361,7 +361,21 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 .calendrier td.reservable:hover { box-shadow: inset 0 0 0 2px var(--primaire); background: var(--primaire-clair); }
 .calendrier td.week-end { background: var(--fond); }
 .calendrier td.ferie { background: var(--alerte-clair); }
-.calendrier td.aujourdhui { box-shadow: inset 0 0 0 2px var(--primaire); }
+/* Jour en cours : le contour de la COLONNE est marqué (bords gauche et droit
+   de chaque cellule, haut de l'en-tête, bas de la dernière ligne), pas les
+   cellules une à une. */
+.calendrier thead th.aujourdhui,
+.calendrier td.aujourdhui { border-left: 2px solid var(--primaire); border-right: 2px solid var(--primaire); }
+.calendrier thead th.aujourdhui { border-top: 2px solid var(--primaire); color: var(--primaire); }
+.calendrier thead th.aujourdhui div { color: inherit !important; }
+.calendrier tbody tr:last-child td.aujourdhui { border-bottom: 2px solid var(--primaire); }
+/* Glisser-déposer d'une pose prévue vers une autre ligne du même type */
+.calendrier .trait[draggable="true"] { cursor: grab; }
+.calendrier .trait.en-glisse { opacity: .45; }
+.calendrier tr.cible-ok td.jour { background: var(--succes-clair); box-shadow: inset 0 2px 0 var(--succes), inset 0 -2px 0 var(--succes); }
+.calendrier tr.cible-ok th.appareil { box-shadow: inset 4px 0 0 var(--succes); }
+.calendrier tr.cible-non td.jour { background: var(--danger-clair); cursor: not-allowed; }
+.calendrier tr.cible-non th.appareil { box-shadow: inset 4px 0 0 var(--danger); }
 .calendrier .trait {
   position: absolute; inset: 4px 0; border-radius: 3px;
   display: flex; align-items: center; justify-content: center;
@@ -370,9 +384,6 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .calendrier .trait.debut { left: 3px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
 .calendrier .trait.fin { right: 3px; border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
-/* Veille de la pose : l'appareil est réservé, en plus clair pour la distinguer
-   des jours où il est réellement chez le patient. */
-.calendrier .trait.veille { opacity: .4; }
 /* Heures de pose (à gauche) et de dépose (à droite) sur le trait, affichées
    en vue rapprochée (3 jours). Le nom du patient reste au milieu. */
 .calendrier .trait .trait-heure {

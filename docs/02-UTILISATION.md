@@ -135,20 +135,31 @@ patients. Le rendez-vous n'est pas effacé : il reste consultable, marqué
 
 Le matériel en lignes, les jours en colonnes. Chaque trait coloré est un examen
 en cours : on voit d'un coup d'œil les périodes chargées et les appareils libres.
-Pour un Holter 24 h, le trait court sur **trois jours** : la **veille de la
-pose** (en plus clair — l'appareil est réservé), le **jour de pose** au milieu,
-où s'inscrit le nom du patient, et le **jour de dépose**. Les examens plus
-longs (48 h, 72 h, Spider Flash) s'étendent d'autant. Cliquez sur un trait pour
-voir le patient concerné.
+Le trait couvre **exactement la période où l'appareil est chez le patient** :
+du **jour de pose** (où s'inscrit le nom du patient) au **jour de dépose** ; un
+Holter 24 h occupe donc deux jours, les examens plus longs (48 h, 72 h, Spider
+Flash) s'étendent d'autant. Cliquez sur un trait pour voir le patient concerné.
+Les MAPA sont en **rouge**, les polygraphies en **vert**, les Holter en deux
+nuances de bleu, le Spider Flash en orange.
 
-Les boutons du haut font défiler la période ; la liste déroulante propose
-deux vues : **30 jours** (vue d'ensemble) et **3 jours** (vue rapprochée,
-navigation par pas de 3 jours). En vue **3 jours**, chaque trait
-affiche l'**heure de pose à gauche**, le **nom du patient** au milieu et
-l'**heure de dépose à droite**. Dans les deux vues, le trait **démarre et
-s'arrête à la position de l'heure** dans la colonne du jour (8 h au bord
-gauche, 18 h au bord droit) : on lit d'un coup d'œil si la pose est en début
-ou en fin de journée.
+Le calendrier s'ouvre en vue **3 jours** (hier, aujourd'hui, demain), la vue
+de travail ; la liste déroulante permet de passer en **30 jours** (vue
+d'ensemble). Les boutons du haut font défiler la période (par pas de 3 jours
+en vue rapprochée). La **colonne du jour** est encadrée d'un trait de couleur.
+En vue **3 jours**, chaque trait affiche l'**heure de pose à gauche**, le
+**nom du patient** au milieu et l'**heure de dépose à droite**. Dans les deux
+vues, le trait **démarre et s'arrête à la position de l'heure** dans la colonne
+du jour (8 h au bord gauche, 18 h au bord droit) : on lit d'un coup d'œil si la
+pose est en début ou en fin de journée.
+
+**Changer d'appareil en glissant** — un rendez-vous encore **prévu** (matériel
+pas encore posé) se déplace à la souris : attrapez son trait et glissez-le sur
+la ligne d'un autre appareil **du même type**. La ligne se colore en **vert** si
+cet appareil est libre exactement aux mêmes horaires de pose et de dépose (le
+rendez-vous y est alors déposé, sans rien changer aux heures ni au rendez-vous
+cardiologue) ; elle se colore en **rouge** et refuse le dépôt si l'appareil est
+déjà pris sur cette période, hors service ou d'un autre type. Rien n'est
+modifié tant que le trait n'est pas lâché sur une ligne verte.
 
 **Filtrer par type** — cliquez sur un type dans la légende (Holter DMS,
 Holter ELA, MAPA…) pour le masquer et alléger le tableau ; un second clic

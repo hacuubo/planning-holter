@@ -16,8 +16,8 @@ import {
   libelleCourt,
 } from '../core/materiel.js';
 import {
-  chargeDesCreneaux, creneauSature, creneauxPoseDuJour, planChangementAppareil,
-  proposerRdvDepuisPose,
+  appareilOccupe, chargeDesCreneaux, creneauSature, creneauxPoseDuJour,
+  finImmobilisation, planChangementAppareil, proposerRdvDepuisPose,
 } from '../core/regles.js';
 import * as api from '../data/api.js';
 import {
@@ -32,9 +32,13 @@ const INITIALES_JOURS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
   'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
-/** Premier jour affiché et largeur de la fenêtre, en jours. */
-let debutFenetre = ajouterJours(aujourdHui(), -7);
-let largeur = 30;
+/** Largeur de la fenêtre en jours (3 par défaut : la vue rapprochée est la
+ *  vue de travail) et premier jour affiché (hier, pour centrer aujourd'hui). */
+let largeur = 3;
+let debutFenetre = ajouterJours(aujourdHui(), -1);
+
+/** Glisser-déposer d'une pose prévue vers une autre ligne du même type. */
+let glisse = null; // { pose, appareil, cibles: Map<appareilId, {ok, motif}> }
 
 /** Types de matériel masqués d'un clic sur la légende (clé catégorie|marque). */
 const typesMasques = new Set();
@@ -71,8 +75,9 @@ export function afficherCalendrier(conteneur) {
       el('div', { style: 'min-width:130px' }, el('select', {
         onchange: (e) => {
           largeur = Number(e.target.value);
-          // En passant en vue 3 jours, on se centre sur aujourd'hui.
-          if (largeur <= 7) debutFenetre = ajouterJours(aujourdHui(), -1);
+          // Vue 3 jours : centrée sur aujourd'hui ; vue 30 jours : une
+          // semaine de recul.
+          debutFenetre = ajouterJours(aujourdHui(), largeur <= 7 ? -1 : -7);
           redessiner();
         },
       }, [3, 30].map((n) => {
@@ -127,7 +132,7 @@ function decaler(jours) {
 }
 
 function allerAujourdHui() {
-  debutFenetre = ajouterJours(aujourdHui(), -7);
+  debutFenetre = ajouterJours(aujourdHui(), largeur <= 7 ? -1 : -7);
   redessiner();
 }
 
@@ -152,12 +157,11 @@ function tableauCalendrier() {
   const dernier = jours[jours.length - 1];
   const today = aujourdHui();
 
-  // Poses concernées par la fenêtre affichée. Le trait démarre la VEILLE de
-  // la pose (jour de réservation de l'appareil) : on garde donc aussi les
-  // poses dont seule la veille tombe dans la fenêtre.
+  // Poses concernées par la fenêtre affichée : le trait couvre exactement la
+  // période pendant laquelle l'appareil est chez le patient (pose → dépose).
   const poses = etat.poses.filter((p) => (
     p.statut !== 'annule'
-    && ecartJours(ajouterJours(decouper(p.debut).date, -1), dernier) >= 0
+    && ecartJours(decouper(p.debut).date, dernier) >= 0
     && ecartJours(debutFenetre, decouper(p.fin).date) >= 0
   ));
 
@@ -188,7 +192,10 @@ function tableauCalendrier() {
     const ferie = nomJourFerie(jour, params);
     return el(
       'th',
-      { title: ferie ? `${dateEnFrancaisLong(jour)} — ${ferie}` : dateEnFrancaisLong(jour) },
+      {
+        class: jour === today ? 'aujourdhui' : null,
+        title: ferie ? `${dateEnFrancaisLong(jour)} — ${ferie}` : dateEnFrancaisLong(jour),
+      },
       el('div', { style: 'font-weight:800' }, String(Number(jour.slice(8, 10)))),
       el('div', { style: 'color:#94a3b8' }, INITIALES_JOURS[js]),
     );
@@ -205,13 +212,10 @@ function tableauCalendrier() {
       if (jour === today) classes.push('aujourdhui');
 
       const td = el('td', { class: classes.join(' ') });
-      // La période réelle (pose -> dépose) passe avant la veille : quand deux
-      // examens s'enchaînent, la dépose de l'un ne doit pas être masquée par
-      // la veille du suivant.
       const pose = posesAppareil.find((p) => (
         ecartJours(decouper(p.debut).date, jour) >= 0
         && ecartJours(jour, decouper(p.fin).date) >= 0
-      )) || posesAppareil.find((p) => ajouterJours(decouper(p.debut).date, -1) === jour);
+      ));
       if (pose) {
         td.append(traitDePose(pose, jour, appareil));
       } else if (jour >= today && estJourOuvre(jour, params)
@@ -225,14 +229,30 @@ function tableauCalendrier() {
       return td;
     });
 
-    return el(
+    const ligne = el(
       'tr',
-      {},
+      {
+        // Cible d'un glisser-déposer : la ligne se colore en vert si l'appareil
+        // est libre aux mêmes horaires, en rouge sinon (dépôt refusé).
+        ondragover: (e) => {
+          if (!glisse) return;
+          const verdict = evaluerCible(appareil);
+          ligne.classList.toggle('cible-ok', verdict.ok);
+          ligne.classList.toggle('cible-non', !verdict.ok);
+          if (verdict.ok) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+          else e.dataTransfer.dropEffect = 'none';
+        },
+        ondragleave: (e) => {
+          if (!ligne.contains(e.relatedTarget)) ligne.classList.remove('cible-ok', 'cible-non');
+        },
+        ondrop: (e) => { e.preventDefault(); deposerSur(appareil); },
+      },
       el('th', { class: 'appareil', title: libelleAppareil(appareil) },
         el('span', { class: `etiquette ${classeMateriel(appareil)}` }, libelleCourt(appareil)),
         appareil.urgence ? ' ⚠' : ''),
       cellules,
     );
+    return ligne;
   });
 
   return el(
@@ -265,16 +285,14 @@ function traitDePose(pose, jour, appareil) {
   const d = decouper(pose.fin);
   const debut = p.date;
   const fin = d.date;
-  // Le trait couvre trois jours pour un examen de 24 h : la veille de la
-  // pose (appareil réservé, affichée en plus clair), le jour de pose au
-  // milieu (où s'inscrivent l'heure de pose et le nom du patient) et le
-  // jour de dépose, avec son heure. Dans la colonne du jour de pose, le
-  // trait DÉMARRE à la position de l'heure de pose ; dans celle du jour de
-  // dépose, il S'ARRÊTE à la position de l'heure de dépose.
-  const veille = ajouterJours(debut, -1);
+  // Le trait couvre exactement la période où l'appareil est chez le patient :
+  // le jour de pose (heure de pose et nom du patient) jusqu'au jour de dépose
+  // (heure de dépose). Dans la colonne du jour de pose, le trait DÉMARRE à la
+  // position de l'heure de pose ; dans celle du jour de dépose, il S'ARRÊTE à
+  // la position de l'heure de dépose.
   const classes = ['trait', classeMateriel(appareil)];
   const styles = [];
-  if (jour === veille) classes.push('veille', 'debut');
+  const deplacable = pose.statut === 'prevu';
   if (jour === debut) {
     classes.push('debut');
     styles.push(`left:${positionHeure(p.heure).toFixed(1)}%`);
@@ -304,12 +322,82 @@ function traitDePose(pose, jour, appareil) {
       class: classes.join(' '),
       style: styles.length ? styles.join(';') : null,
       title: `${patient} · ${libelleAppareil(appareil)} · `
-        + `pose le ${dateEnFrancais(debut)} à ${p.heure}, dépose le ${dateEnFrancais(fin)} à ${d.heure} `
-        + `(appareil réservé dès le ${dateEnFrancais(veille)})`,
+        + `pose le ${dateEnFrancais(debut)} à ${p.heure}, dépose le ${dateEnFrancais(fin)} à ${d.heure}`
+        + (deplacable ? ' — glissez ce trait sur une autre ligne du même type pour changer d’appareil' : ''),
       onclick: () => detailPose(pose, appareil),
+      // Une pose prévue se glisse à la souris sur une autre ligne du même type.
+      draggable: deplacable ? 'true' : null,
+      ondragstart: deplacable ? (e) => {
+        glisse = { pose, appareil, cibles: new Map() };
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', pose.id);
+        e.currentTarget.classList.add('en-glisse');
+      } : null,
+      ondragend: deplacable ? (e) => {
+        glisse = null;
+        e.currentTarget.classList.remove('en-glisse');
+        nettoyerCibles();
+      } : null,
     },
     contenu,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Glisser-déposer : changer d'appareil sans changer d'horaires
+// ---------------------------------------------------------------------------
+
+/**
+ * Une ligne peut recevoir la pose glissée si l'appareil est du même type,
+ * en service, et libre sur exactement la même période (pose → dépose, délai
+ * de reconditionnement compris). Le verdict est mémorisé le temps du geste.
+ */
+function evaluerCible(cible) {
+  if (!glisse) return { ok: false, motif: '' };
+  if (glisse.cibles.has(cible.id)) return glisse.cibles.get(cible.id);
+  const { pose, appareil } = glisse;
+  const params = parametres();
+  let verdict;
+  if (cible.id === appareil.id) {
+    verdict = { ok: false, motif: 'c’est déjà son appareil' };
+  } else if (cible.categorie !== appareil.categorie) {
+    verdict = { ok: false, motif: `ce n’est pas un ${CATEGORIES[appareil.categorie]?.libelle || appareil.categorie}` };
+  } else if (cible.actif === false || cible.hors_service === true) {
+    verdict = { ok: false, motif: 'appareil retiré ou hors service' };
+  } else if (appareilOccupe(cible.id, posesActives(), pose.debut, finImmobilisation(pose, params), params, pose.id)) {
+    verdict = { ok: false, motif: 'déjà pris sur ces horaires' };
+  } else {
+    verdict = { ok: true, motif: '' };
+  }
+  glisse.cibles.set(cible.id, verdict);
+  return verdict;
+}
+
+function nettoyerCibles() {
+  document.querySelectorAll('.calendrier tr.cible-ok, .calendrier tr.cible-non')
+    .forEach((tr) => tr.classList.remove('cible-ok', 'cible-non'));
+}
+
+async function deposerSur(cible) {
+  if (!glisse) return;
+  const { pose, appareil } = glisse;
+  const verdict = evaluerCible(cible);
+  glisse = null;
+  nettoyerCibles();
+  if (!verdict.ok) {
+    notifier(`Impossible de déplacer ${nomPatient(pose.rdv)} sur ${libelleAppareil(cible)} : ${verdict.motif}.`, 'erreur');
+    return;
+  }
+  try {
+    await api.changerAppareil(pose.id, cible.id);
+    notifier(`${nomPatient(pose.rdv)} : ${libelleAppareil(appareil)} → ${libelleAppareil(cible)}, mêmes horaires.`, 'succes');
+    await rafraichir();
+    redessiner();
+  } catch (erreur) {
+    notifierErreur(erreur);
+    await rafraichir().catch(() => {});
+    redessiner();
+  }
 }
 
 function detailPose(pose, appareil) {
