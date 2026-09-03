@@ -1,6 +1,6 @@
 {
   "name": "planning-holter",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Planning des Holter ECG, MAPA, polygraphies ventilatoires et Spider Flash",
   "private": true,
   "type": "module",
