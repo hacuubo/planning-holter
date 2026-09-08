@@ -378,10 +378,13 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 .calendrier tr.cible-ok th.appareil { box-shadow: inset 4px 0 0 var(--succes); }
 .calendrier tr.cible-non td.jour { background: var(--danger-clair); cursor: not-allowed; }
 .calendrier tr.cible-non th.appareil { box-shadow: inset 4px 0 0 var(--danger); }
+/* Les traits reprennent exactement la teinte des cartes de l'onglet Journée :
+   fond pastel de la catégorie, texte et liseré dans la couleur soutenue. */
 .calendrier .trait {
-  position: absolute; inset: 4px 0; border-radius: 3px;
+  position: absolute; inset: 3px 0; border-radius: 3px;
   display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: .62rem; font-weight: 700; overflow: hidden;
+  border: 1px solid currentColor;
+  font-size: .62rem; font-weight: 700; overflow: hidden;
   cursor: pointer;
 }
 .calendrier .trait.debut { left: 3px; border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
@@ -394,12 +397,12 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .calendrier .trait .trait-heure-fin { margin-left: auto; }
 .calendrier .trait .trait-nom { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.calendrier .trait.holter_ecg-DMS { background: var(--holter-dms); }
-.calendrier .trait.holter_ecg-ELA { background: var(--holter-ela); }
-.calendrier .trait.mapa { background: var(--mapa); }
-.calendrier .trait.polygraphie { background: var(--polygraphie); }
-.calendrier .trait.spider { background: var(--spider); }
-.calendrier .trait.autre { background: var(--texte-doux); }
+.calendrier .trait.holter_ecg-DMS { background: var(--holter-dms-fond); color: var(--holter-dms); }
+.calendrier .trait.holter_ecg-ELA { background: var(--holter-ela-fond); color: var(--holter-ela); }
+.calendrier .trait.mapa { background: var(--mapa-fond); color: var(--mapa); }
+.calendrier .trait.polygraphie { background: var(--polygraphie-fond); color: var(--polygraphie); }
+.calendrier .trait.spider { background: var(--spider-fond); color: var(--spider); }
+.calendrier .trait.autre { background: var(--bord); color: var(--texte-doux); }
 
 /* --------------------------------------------------------- Propositions */
 .propositions { display: grid; gap: .5rem; }
