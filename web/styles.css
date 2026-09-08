@@ -22,12 +22,14 @@
   --succes: #15803d;
   --succes-clair: #dcfce7;
 
-  --holter-dms: #1e3a8a;
-  --holter-dms-fond: #dbeafe;
-  --holter-ela: #1d4ed8;
-  --holter-ela-fond: #e0f2fe;
-  --mapa: #dc2626;             /* rouge : se distingue franchement des Holter bleus */
-  --mapa-fond: #fee2e2;
+  /* Couleurs des fiches papier du cabinet : jaune = ELA, rose = DMS,
+     bleu = MAPA, vert = polygraphie, orange = Spider Flash. */
+  --holter-dms: #be185d;
+  --holter-dms-fond: #fce7f3;
+  --holter-ela: #a16207;
+  --holter-ela-fond: #fef9c3;
+  --mapa: #1d4ed8;
+  --mapa-fond: #dbeafe;
   --polygraphie: #15803d;      /* vert franc */
   --polygraphie-fond: #dcfce7;
   --spider: #c2410c;
