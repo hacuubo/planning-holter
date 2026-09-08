@@ -139,8 +139,9 @@ Le trait couvre **exactement la période où l'appareil est chez le patient** :
 du **jour de pose** (où s'inscrit le nom du patient) au **jour de dépose** ; un
 Holter 24 h occupe donc deux jours, les examens plus longs (48 h, 72 h, Spider
 Flash) s'étendent d'autant. Cliquez sur un trait pour voir le patient concerné.
-Les MAPA sont en **rouge**, les polygraphies en **vert**, les Holter en deux
-nuances de bleu, le Spider Flash en orange.
+Les couleurs reprennent celles des fiches papier remises aux patients :
+**jaune** pour les Holter ELA, **rose** pour les Holter DMS, **bleu** pour
+les MAPA, **vert** pour les polygraphies, **orange** pour le Spider Flash.
 
 Le calendrier s'ouvre en vue **3 jours** (hier, aujourd'hui, demain), la vue
 de travail ; la liste déroulante permet de passer en **30 jours** (vue

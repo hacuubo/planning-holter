@@ -13,8 +13,8 @@ export const CATEGORIES = {
   holter_ecg: {
     code: 'holter_ecg',
     libelle: 'Holter ECG',
-    couleur: '#1d4ed8',
-    fond: '#dbeafe',
+    couleur: '#be185d',
+    fond: '#fce7f3',
     dureesHeures: [24, 48, 72],
     dureeParDefaut: 24,
     marques: ['ELA', 'DMS'],
@@ -22,8 +22,8 @@ export const CATEGORIES = {
   mapa: {
     code: 'mapa',
     libelle: 'MAPA',
-    couleur: '#dc2626',
-    fond: '#fee2e2',
+    couleur: '#1d4ed8',
+    fond: '#dbeafe',
     dureesHeures: [24],
     dureeParDefaut: 24,
     marques: [],
@@ -58,12 +58,13 @@ export const CATEGORIES = {
 };
 
 /**
- * Nuances par marque : le cahier des charges demande deux nuances d'une même
- * couleur pour distinguer les Holter ECG DMS des Holter ECG ELA.
+ * Couleurs par marque, calées sur les fiches papier remises aux patients :
+ * JAUNE pour les Holter ELA, ROSE pour les Holter DMS (le MAPA est bleu,
+ * la polygraphie verte, le Spider Flash orange).
  */
 export const NUANCES_MARQUE = {
-  'holter_ecg|DMS': { couleur: '#1e3a8a', fond: '#dbeafe' }, // bleu profond
-  'holter_ecg|ELA': { couleur: '#3b82f6', fond: '#e0f2fe' }, // bleu clair
+  'holter_ecg|DMS': { couleur: '#be185d', fond: '#fce7f3' }, // rose
+  'holter_ecg|ELA': { couleur: '#a16207', fond: '#fef9c3' }, // jaune
 };
 
 /** Couleurs d'affichage d'un appareil (catégorie + éventuelle nuance marque). */

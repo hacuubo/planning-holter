@@ -46,7 +46,9 @@ Pour la faire tourner sur votre propre ordinateur plutôt qu'en ligne, voir
 
 **Onglet Journée** — le programme de la personne qui pose et dépose le matériel,
 quart d'heure par quart d'heure, avec un code couleur par type d'appareil
-(deux nuances de bleu distinguent les Holter DMS des Holter ELA). Deux boutons :
+(couleurs des fiches papier du cabinet : jaune pour les Holter ELA, rose pour
+les DMS, bleu pour les MAPA, vert pour les polygraphies, orange pour le
+Spider Flash). Deux boutons :
 « Posé » et « Rendu ». Un appareil rendu redevient disponible immédiatement.
 
 **Onglet Rendez-vous** — la secrétaire saisit le rendez-vous avec le cardiologue
