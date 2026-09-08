@@ -598,7 +598,8 @@ function nouveauRdvDepuisCase(appareil, jour) {
             saisie.duree,
             (v) => { saisie.duree = Number(v); recalculer(); },
           ))
-          : champ('Durée', el('input', { type: 'text', value: dureeLisible(durees[0]), disabled: true })),
+          : champ('Durée', el('div', { class: 'aide', style: 'padding:.55rem 0;font-weight:700' },
+            `${dureeLisible(durees[0])} — durée fixe pour ce matériel`)),
         champ('Nom de famille', el('input', {
           type: 'text', placeholder: 'DUPONT', autocomplete: 'off',
           oninput: (e) => { saisie.nom = e.target.value; majBouton(); },

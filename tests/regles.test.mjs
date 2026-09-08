@@ -4,8 +4,9 @@ import {
   appareilOccupe, appareilsLibres, chargeDesCreneaux, chevauche, choisirAppareil,
   creneauDepose, creneauSature, creneauxPoseCandidats, creneauxPoseDuJour,
   disponibilitesParType, placesRestantes, planChangementAppareil, planifier,
-  poseIdeale, propositionReattribution, proposerRdvDepuisPose,
-  propositionsAlternatives,
+  poseIdeale, posesOubliees, prochaineReservation, propositionReattribution,
+  proposerRdvDepuisPose, propositionsAlternatives, rdvFutursMemeNom,
+  retoursEnRetard,
 } from '../web/js/core/regles.js';
 import { INVENTAIRE_INITIAL } from '../web/js/core/materiel.js';
 import { ajouterJours, decouper } from '../web/js/core/dates.js';
@@ -769,4 +770,46 @@ test('clic calendrier : appareil d’urgence accepté avec avertissement', () =>
   });
   assert.ok(r.possible);
   assert.ok(r.avertissements.some((a) => /urgences/.test(a)));
+});
+
+// ---------------------------------------------------------------------------
+// Oublis, retards et doublons
+// ---------------------------------------------------------------------------
+
+test('une pose passée jamais marquée « posé » est signalée après 30 minutes', () => {
+  const p1 = pose(parCode('1', 'DMS'), '2026-08-25 09:45', '2026-08-26 09:45', { rdv_id: 'r1' });
+  assert.equal(posesOubliees([p1], '2026-08-25 10:00').length, 0); // 15 min : pas encore
+  assert.equal(posesOubliees([p1], '2026-08-25 10:15').length, 1); // 30 min : signalée
+  const marquee = { ...p1, statut: 'pose' };
+  assert.equal(posesOubliees([marquee], '2026-08-25 12:00').length, 0);
+});
+
+test('un appareil non rendu après l’heure de dépose est signalé en retard', () => {
+  const p1 = pose(parCode('1', 'DMS'), '2026-08-25 09:45', '2026-08-26 09:45', { rdv_id: 'r1', statut: 'pose' });
+  assert.equal(retoursEnRetard([p1], '2026-08-26 10:00').length, 0);  // 15 min de marge
+  assert.equal(retoursEnRetard([p1], '2026-08-26 10:15').length, 1);  // en retard
+  const rendu = { ...p1, statut: 'rendu', retour_effectif: '2026-08-26 10:30' };
+  assert.equal(retoursEnRetard([rendu], '2026-08-26 12:00').length, 0);
+});
+
+test('la prochaine réservation d’un appareil en retard est identifiée', () => {
+  const dms1 = parCode('1', 'DMS');
+  const enRetard = pose(dms1, '2026-08-25 09:45', '2026-08-26 09:45', { rdv_id: 'r1', statut: 'pose' });
+  const suivante = pose(dms1, '2026-08-26 14:00', '2026-08-27 09:45', { rdv_id: 'r2' });
+  const lointaine = pose(dms1, '2026-08-28 09:45', '2026-08-29 09:45', { rdv_id: 'r3' });
+  const trouvee = prochaineReservation(dms1.id, [enRetard, lointaine, suivante], '2026-08-26 10:15');
+  assert.equal(trouvee.rdv_id, 'r2');
+});
+
+test('un patient du même nom avec un rendez-vous à venir est détecté', () => {
+  const p1 = {
+    ...pose(parCode('1', 'DMS'), '2026-08-25 09:45', '2026-08-26 09:45', { rdv_id: 'r1' }),
+    rdv: { id: 'r1', patient_nom: 'Dupont', statut: 'prevu', rdv_cardio: '2026-08-26 10:00' },
+  };
+  const doublons = rdvFutursMemeNom([p1], 'DUPONT', '2026-08-24 08:00');
+  assert.equal(doublons.length, 1);
+  // Rendez-vous déjà passé : plus signalé.
+  assert.equal(rdvFutursMemeNom([p1], 'dupont', '2026-08-27 08:00').length, 0);
+  // Autre nom : rien.
+  assert.equal(rdvFutursMemeNom([p1], 'MARTIN', '2026-08-24 08:00').length, 0);
 });

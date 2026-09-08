@@ -884,3 +884,69 @@ export function proposerRdvDepuisPose({
     motif: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// 10. Oublis et retards (fiabilité des disponibilités affichées)
+// ---------------------------------------------------------------------------
+
+/**
+ * Poses dont l'heure est passée depuis plus de `margeMinutes` mais jamais
+ * marquées « Posé » : soit un oubli de clic, soit un patient qui n'est pas
+ * venu. Dans les deux cas, le planning affiché ne reflète plus la réalité.
+ */
+export function posesOubliees(poses, maintenant, margeMinutes = 30) {
+  const plafond = horodatageEnMinutes(maintenant) - margeMinutes;
+  return poses.filter((p) => (
+    p.statut === 'prevu' && horodatageEnMinutes(p.debut) <= plafond
+  ));
+}
+
+/**
+ * Appareils toujours dehors après l'heure de dépose prévue : le matériel est
+ * marqué « posé » mais jamais « rendu ». Tant que ce n'est pas régularisé,
+ * l'appareil paraît disponible alors qu'il est encore chez le patient.
+ */
+export function retoursEnRetard(poses, maintenant, margeMinutes = 30) {
+  const plafond = horodatageEnMinutes(maintenant) - margeMinutes;
+  return poses.filter((p) => (
+    p.statut === 'pose' && !p.retour_effectif && horodatageEnMinutes(p.fin) <= plafond
+  ));
+}
+
+/**
+ * Prochaine réservation prévue d'un appareil après un instant donné :
+ * le patient menacé quand l'appareil est en retard de retour.
+ */
+export function prochaineReservation(appareilId, poses, apresTs) {
+  let prochaine = null;
+  for (const p of poses) {
+    if (p.appareil_id !== appareilId || p.statut !== 'prevu') continue;
+    if (horodatageEnMinutes(p.debut) < horodatageEnMinutes(apresTs)) continue;
+    if (!prochaine || horodatageEnMinutes(p.debut) < horodatageEnMinutes(prochaine.debut)) prochaine = p;
+  }
+  return prochaine;
+}
+
+// ---------------------------------------------------------------------------
+// 11. Détection des doublons à la prise de rendez-vous
+// ---------------------------------------------------------------------------
+
+/**
+ * Rendez-vous à venir portant le même nom de famille que celui en cours de
+ * saisie : deux secrétaires peuvent recevoir le même appel, ou un patient
+ * rappeler sans dire qu'il a déjà réservé. Renvoie au plus un rendez-vous
+ * par identifiant, le plus proche d'abord.
+ */
+export function rdvFutursMemeNom(poses, nom, maintenant) {
+  const cherche = (nom || '').trim().toUpperCase();
+  if (cherche.length < 2) return [];
+  const minMaintenant = horodatageEnMinutes(maintenant);
+  const parRdv = new Map();
+  for (const p of poses) {
+    if (!poseActive(p) || !p.rdv || p.rdv.statut === 'annule') continue;
+    if ((p.rdv.patient_nom || '').trim().toUpperCase() !== cherche) continue;
+    if (horodatageEnMinutes(p.rdv.rdv_cardio) < minMaintenant) continue;
+    if (!parRdv.has(p.rdv_id)) parRdv.set(p.rdv_id, p.rdv);
+  }
+  return [...parRdv.values()].sort((a, b) => a.rdv_cardio.localeCompare(b.rdv_cardio));
+}

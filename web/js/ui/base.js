@@ -225,6 +225,18 @@ export function nomPatient(rdv) {
   return (rdv.patient_nom || '').toUpperCase().trim() || '—';
 }
 
+/**
+ * Numéro de téléphone cliquable : sur téléphone, un appui lance l'appel.
+ * Renvoie null si aucun numéro n'est renseigné.
+ */
+export function lienTelephone(tel) {
+  if (!tel) return null;
+  return el('a', {
+    class: 'aide lien-tel',
+    href: `tel:${String(tel).replace(/[^+0-9]/g, '')}`,
+  }, `☎ ${tel}`);
+}
+
 /** Libellé long du sexe, pour les info-bulles et les documents. */
 export function sexeLisible(sexe) {
   return { F: 'Femme', M: 'Homme' }[sexe] || '';

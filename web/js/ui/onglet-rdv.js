@@ -12,13 +12,16 @@ import {
   maintenantHorodatage, nomJourFerie,
 } from '../core/dates.js';
 import { CATEGORIES, dureeLisible, dureesAutorisees } from '../core/materiel.js';
-import { disponibilitesParType, planifier, propositionsAlternatives } from '../core/regles.js';
+import {
+  disponibilitesParType, planifier, propositionsAlternatives, rdvFutursMemeNom,
+} from '../core/regles.js';
 import * as api from '../data/api.js';
 import { cardiologues, etat, parametres, posesActives, rafraichir } from '../data/etat.js';
 import {
   carte, champ, el, encart, etiquetteAppareil, messageVide, notifier,
-  notifierErreur, remplir, selection,
+  notifierErreur, ouvrirFenetre, remplir, selection,
 } from './base.js';
+import { imprimerConvocation } from './convocation.js';
 
 /** Saisie en cours, conservée tant que la secrétaire ne change pas d'onglet. */
 const saisie = {
@@ -49,7 +52,7 @@ export function afficherRdv(conteneur) {
   remplir(
     conteneur,
     carte('Nouveau rendez-vous', formulairePatient(), formulaireRdv()),
-    carte('Matériel à poser', choixMateriels()),
+    carte('Matériel à poser', choixMateriels(), boutonAuPlusTot()),
     conteneurResultat,
   );
 
@@ -60,7 +63,34 @@ export function afficherRdv(conteneur) {
 // Formulaires
 // ---------------------------------------------------------------------------
 
+let zoneDoublons = null;
+let minuterieDoublons = null;
+
+/**
+ * Deux secrétaires peuvent recevoir le même appel, ou un patient rappeler
+ * sans dire qu'il a déjà réservé : dès que le nom saisi correspond à un
+ * rendez-vous à venir, un avertissement s'affiche sous le formulaire.
+ */
+function majDoublons() {
+  clearTimeout(minuterieDoublons);
+  minuterieDoublons = setTimeout(() => {
+    if (!zoneDoublons) return;
+    const doublons = rdvFutursMemeNom(posesActives(), saisie.patient_nom, maintenantHorodatage());
+    if (doublons.length === 0) { remplir(zoneDoublons); return; }
+    remplir(zoneDoublons, encart(
+      'alerte',
+      el('strong', {}, `⚠ ${saisie.patient_nom.trim().toUpperCase()} a déjà `
+        + `${doublons.length > 1 ? `${doublons.length} rendez-vous` : 'un rendez-vous'} à venir : `),
+      doublons.slice(0, 2).map((r) => `${dateEnFrancaisLong(decouper(r.rdv_cardio).date)} `
+        + `à ${decouper(r.rdv_cardio).heure} (${r.cardiologue})`).join(' · '),
+      '. Vérifiez qu’il ne s’agit pas d’une double réservation (onglet Recherche).',
+    ));
+  }, 250);
+}
+
 function formulairePatient() {
+  zoneDoublons = el('div', {});
+  majDoublons();
   return el(
     'div',
     {},
@@ -72,7 +102,7 @@ function formulairePatient() {
         value: saisie.patient_nom,
         autocomplete: 'off',
         placeholder: 'DUPONT',
-        oninput: (e) => { saisie.patient_nom = e.target.value; majBoutonValider(); },
+        oninput: (e) => { saisie.patient_nom = e.target.value; majBoutonValider(); majDoublons(); },
       })),
       champ('Sexe', choixSexe()),
       champ('Téléphone', el('input', {
@@ -80,6 +110,7 @@ function formulairePatient() {
         oninput: (e) => { saisie.telephone = e.target.value; },
       }), { facultatif: true }),
     ),
+    zoneDoublons,
     el('p', { class: 'aide', style: 'margin:0' },
       'Seuls le nom de famille et le sexe sont enregistrés. En cas d’homonymes, '
       + 'utilisez la note interne ci-dessous pour les distinguer.'),
@@ -184,6 +215,72 @@ function choixMateriels() {
   });
 
   return el('div', { class: 'recap' }, lignes);
+}
+
+// ---------------------------------------------------------------------------
+// « Au plus tôt » : les trois premiers créneaux possibles
+// ---------------------------------------------------------------------------
+
+function boutonAuPlusTot() {
+  return el(
+    'div',
+    { class: 'barre-outils', style: 'margin:.8rem 0 0' },
+    el('button', { class: 'bouton', onclick: () => proposerAuPlusTot() }, '⚡ Au plus tôt'),
+    el('span', { class: 'aide' },
+      'Propose les trois premiers rendez-vous possibles pour le matériel coché.'),
+  );
+}
+
+function proposerAuPlusTot() {
+  const materiels = materielsDemandes();
+  if (materiels.length === 0) {
+    notifier('Cochez d’abord le matériel souhaité.', 'erreur');
+    return;
+  }
+
+  // On écarte les créneaux à marge réduite (dépose collée au rendez-vous) :
+  // « au plus tôt » ne doit pas rimer avec « à la course ».
+  const propositions = propositionsAlternatives({
+    rdvCardio: horodatage(aujourdHui(), '00:00'),
+    materiels,
+    appareils: etat.appareils,
+    poses: posesActives(),
+    parametres: parametres(),
+    maintenant: maintenantHorodatage(),
+    maxPropositions: 8,
+    joursExplores: 30,
+  }).filter((prop) => !prop.plan.avertissements.some((a) => /Marge réduite/.test(a)))
+    .slice(0, 3);
+
+  ouvrirFenetre((fermer) => [
+    el('h2', {}, '⚡ Premiers rendez-vous possibles'),
+    propositions.length === 0
+      ? encart('erreur', 'Aucun créneau possible dans les 30 prochains jours pour ce matériel. '
+        + 'Vérifiez le parc (appareils hors service ?) ou essayez un autre matériel.')
+      : el('div', { class: 'propositions' }, propositions.map((prop) => {
+        const quand = decouper(prop.rdvCardio);
+        const pose = decouper(prop.plan.lignes[0].pose);
+        return el(
+          'div',
+          { class: 'proposition' },
+          el('span', { class: 'proposition-date' }, `${dateEnFrancaisLong(quand.date)} à ${quand.heure}`),
+          el('span', { class: 'proposition-detail' },
+            `pose le ${dateEnFrancais(pose.date)} à ${pose.heure} · `,
+            prop.plan.lignes.map((l) => l.appareil.code).join(', ')),
+          el('button', {
+            class: 'bouton petit principal',
+            onclick: () => {
+              saisie.date = quand.date;
+              saisie.heure = quand.heure;
+              fermer();
+              afficherRdv(document.getElementById('vue-rdv'));
+            },
+          }, 'Choisir'),
+        );
+      })),
+    el('div', { class: 'fenetre-actions' },
+      el('button', { class: 'bouton', onclick: fermer }, 'Fermer')),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -433,9 +530,30 @@ async function valider() {
       })),
     );
 
+    const convocation = {
+      patientNom: saisie.patient_nom.trim(),
+      cardiologue: saisie.cardiologue,
+      rdvCardio: horodatage(saisie.date, saisie.heure),
+      lignes: planCourant.lignes.map((l) => ({ appareil: l.appareil, debut: l.pose, fin: l.depose })),
+      nomCabinet: etat.reglages.cabinet?.nom,
+    };
     notifier(`Rendez-vous enregistré pour ${saisie.patient_nom.toUpperCase()}.`, 'succes');
     await rafraichir();
     reinitialiser();
+    ouvrirFenetre((fermer) => [
+      el('h2', {}, '✔ Rendez-vous enregistré'),
+      el('p', {}, `Souhaitez-vous imprimer la convocation de ${convocation.patientNom.toUpperCase()} `
+        + '(numéro d’appareil, dates de pose et de dépose, rendez-vous cardiologue) ?'),
+      el(
+        'div',
+        { class: 'fenetre-actions' },
+        el('button', { class: 'bouton', onclick: fermer }, 'Non merci'),
+        el('button', {
+          class: 'bouton principal',
+          onclick: () => { fermer(); imprimerConvocation(convocation); },
+        }, '🖨 Imprimer la convocation'),
+      ),
+    ]);
   } catch (erreur) {
     notifierErreur(erreur);
     // En cas de conflit avec une autre secrétaire, on repart de données à jour
