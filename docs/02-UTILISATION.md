@@ -23,6 +23,16 @@ En haut à droite, une petite pastille indique l'état de la liaison :
 
 ---
 
+## Installer le planning comme une application
+
+Sur iPhone : ouvrez le site dans Safari, bouton **Partager** puis **« Sur
+l'écran d'accueil »**. Sur ordinateur (Chrome/Edge) : icône **Installer** dans
+la barre d'adresse. Le planning s'ouvre alors plein écran, avec sa propre
+icône 🫀, et reste consultable si la connexion saute un instant (les
+modifications, elles, nécessitent la connexion).
+
+---
+
 ## Onglet **Journée** — poser et déposer
 
 C'est l'écran de la personne qui s'occupe du matériel.
@@ -93,6 +103,18 @@ les plus proches de l'heure demandée. Cliquez sur **Choisir** : le formulaire s
 remplit tout seul. Vous convenez ensuite du rendez-vous cardiologue
 correspondant.
 
+### « Au plus tôt », doublons et convocation
+
+- **⚡ Au plus tôt** (sous le matériel à poser) : propose les trois premiers
+  rendez-vous possibles pour le matériel coché, sans tâtonner date par date.
+- Si le **nom saisi** correspond à un patient qui a **déjà un rendez-vous à
+  venir**, un avertissement s'affiche aussitôt : vérifiez qu'il ne s'agit pas
+  d'une double réservation.
+- Après l'enregistrement, le logiciel propose d'**imprimer la convocation** du
+  patient : numéro d'appareil (dans la couleur de sa fiche), dates de pose et
+  de retrait, rendez-vous cardiologue. Elle reste imprimable à tout moment
+  depuis la fiche du patient (onglet Recherche, bouton « 🖨 Convocation »).
+
 ### Messages que vous pouvez rencontrer
 
 | Message | Ce qu'il faut faire |
@@ -108,8 +130,12 @@ correspondant.
 
 ## Onglet **Recherche** — retrouver, déplacer ou annuler
 
-Tapez les premières lettres du nom de famille. La fiche affiche le rendez-vous
-cardiologue, les appareils attribués, les dates de pose et de dépose.
+Tapez les premières lettres du nom de famille — ou un **numéro d'appareil**
+(52, A, N1, ELA 54…) pour savoir immédiatement où il est : chez quel patient,
+quand il revient, et ses prochaines réservations. La fiche d'un patient
+affiche le rendez-vous cardiologue, les appareils attribués, les dates de pose
+et de dépose ; les numéros de téléphone sont cliquables (un appui lance
+l'appel sur téléphone).
 
 **Déplacer / Modifier** ouvre une fenêtre préremplie avec le rendez-vous
 actuel : changez la date, l'heure ou le matériel (le type de Holter, par
@@ -190,13 +216,21 @@ l'appareil choisi est déjà porté par un autre patient.
 Une pastille rouge sur l'onglet indique le nombre d'alertes en cours,
 recalculé à chaque nouvelle demande et à chaque modification :
 
-1. **Réservations sur un appareil indisponible** (hors service ou retiré du
+1. **Appareils non rendus à l'heure** — l'heure de dépose est passée sans
+   retour enregistré : tant que ce n'est pas régularisé, l'appareil paraît
+   disponible alors qu'il est encore chez le patient. « ✓ Rendu maintenant »
+   régularise en un clic ; si un autre patient attend ce même appareil, il est
+   signalé et réattribuable immédiatement.
+2. **Poses passées sans pointage** — l'heure de pose est passée sans clic
+   « Posé » : soit un oubli (cliquez « ✓ Posé »), soit un patient qui n'est
+   pas venu (« Pas venu » annule et libère l'appareil).
+3. **Réservations sur un appareil indisponible** (hors service ou retiré du
    parc). Le bouton **Réattribuer** cherche d'abord un autre appareil sur le
    **même créneau** — le patient n'a rien à savoir. Sinon, il propose le
    créneau **le plus proche de la durée de port prévue** (24 h en général,
    parfois un peu moins) : après confirmation, le patient est ajouté à la
    liste des rappels.
-2. **Patients à rappeler** — chaque fois qu'un horaire de pose a été modifié
+4. **Patients à rappeler** — chaque fois qu'un horaire de pose a été modifié
    après coup, le patient apparaît ici avec son téléphone et le détail du
    changement. Cochez « Rappelé » une fois le patient prévenu ; la liste est
    partagée entre toutes les secrétaires.

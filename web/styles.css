@@ -416,6 +416,9 @@ td.nombre, th.nombre { text-align: right; font-variant-numeric: tabular-nums; }
 .proposition-detail { color: var(--texte-doux); font-size: .85rem; }
 .proposition .bouton { margin-left: auto; }
 
+.lien-tel { color: var(--primaire); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.lien-tel:hover { text-decoration: underline; }
+
 .recap { border: 1px solid var(--bord); border-radius: 8px; padding: .75rem; background: var(--fond); }
 .recap-ligne { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .35rem 0; }
 .recap-ligne + .recap-ligne { border-top: 1px dashed var(--bord-fort); }

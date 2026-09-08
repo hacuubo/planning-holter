@@ -16,14 +16,16 @@ import * as api from '../data/api.js';
 import { appareilParId, etat, parametres, posesActives, rafraichir } from '../data/etat.js';
 import {
   carte, champ, confirmer, demanderTexte, el, encart, etiquetteAppareil,
-  etiquetteSexe, messageVide, nomPatient, notifier, notifierErreur,
-  ouvrirFenetre, remplir, selection,
+  etiquetteSexe, lienTelephone, messageVide, nomPatient, notifier,
+  notifierErreur, ouvrirFenetre, remplir, selection,
 } from './base.js';
+import { imprimerConvocation } from './convocation.js';
 
 let texteRecherche = '';
 let resultats = null;
 let recherche = false;
 let conteneurResultats = null;
+let appareilsTrouves = [];
 
 export function afficherRecherche(conteneur) {
   const saisie = el('input', {
@@ -47,7 +49,8 @@ export function afficherRecherche(conteneur) {
         el('button', { class: 'bouton principal', onclick: () => lancerRecherche(true) }, 'Rechercher'),
       ),
       el('p', { class: 'aide', style: 'margin:0' },
-        'Saisissez au moins 2 caractères. La recherche porte sur tous les rendez-vous, passés et à venir.'),
+        'Nom de patient (au moins 2 caractères) ou numéro d’appareil (52, A, N1, ELA 54…). '
+        + 'La recherche porte sur tous les rendez-vous, passés et à venir.'),
     ),
     conteneurResultats,
   );
@@ -62,6 +65,8 @@ function lancerRecherche(immediat = false) {
   clearTimeout(minuterie);
   const executer = async () => {
     const texte = texteRecherche.trim();
+    // Un numéro d'appareil se reconnaît immédiatement, même en un caractère.
+    appareilsTrouves = appareilsCorrespondants(texte);
     if (texte.length < 2) {
       resultats = null;
       afficherResultats();
@@ -86,23 +91,91 @@ function lancerRecherche(immediat = false) {
 function afficherResultats() {
   if (!conteneurResultats) return;
 
+  const cartesAppareils = appareilsTrouves.map(ficheAppareil);
+
   if (recherche) {
-    remplir(conteneurResultats, carte(null, messageVide('Recherche en cours…')));
+    remplir(conteneurResultats, cartesAppareils, carte(null, messageVide('Recherche en cours…')));
     return;
   }
   if (resultats === null) {
-    remplir(conteneurResultats);
+    remplir(conteneurResultats, cartesAppareils);
     return;
   }
   if (resultats.length === 0) {
-    remplir(conteneurResultats, carte(null, messageVide('Aucun patient trouvé.')));
+    remplir(conteneurResultats, cartesAppareils,
+      cartesAppareils.length ? null : carte(null, messageVide('Aucun patient trouvé.')));
     return;
   }
 
   remplir(
     conteneurResultats,
+    cartesAppareils,
     carte(`${resultats.length} résultat${resultats.length > 1 ? 's' : ''}`,
       resultats.map(ficheRendezVous)),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recherche par numéro d'appareil : « qui a le 52, et quand revient-il ? »
+// ---------------------------------------------------------------------------
+
+/** Appareils dont le code (ou « marque code ») correspond exactement au texte. */
+function appareilsCorrespondants(texte) {
+  const t = (texte || '').trim().toUpperCase();
+  if (!t) return [];
+  return etat.appareils.filter((a) => (
+    a.code.toUpperCase() === t
+    || `${a.marque || ''} ${a.code}`.trim().toUpperCase() === t
+  ));
+}
+
+function ficheAppareil(appareil) {
+  const maintenant = maintenantHorodatage();
+  const poses = posesActives();
+
+  // Situation actuelle : une pose en cours (posée et pas rendue, ou dont la
+  // période couvre l'instant présent).
+  const enCours = poses.find((p) => (
+    p.appareil_id === appareil.id
+    && (p.statut === 'pose'
+      || (p.statut === 'prevu' && p.debut <= maintenant && maintenant < p.fin))
+  ));
+
+  const prochaines = poses
+    .filter((p) => p.appareil_id === appareil.id && p.statut === 'prevu' && p.debut > maintenant)
+    .sort((a, b) => a.debut.localeCompare(b.debut))
+    .slice(0, 3);
+
+  let situation;
+  if (appareil.actif === false) situation = el('span', { class: 'etiquette urgence' }, 'retiré du parc');
+  else if (appareil.hors_service) situation = el('span', { class: 'etiquette urgence' }, 'hors service');
+  else if (enCours) {
+    const d = decouper(enCours.fin);
+    situation = el('span', {},
+      'Actuellement chez ', el('strong', {}, nomPatient(enCours.rdv)),
+      ` — retour prévu le ${dateEnFrancais(d.date)} à ${d.heure}`,
+      enCours.statut === 'prevu' ? ' (pose non pointée)' : '');
+  } else situation = el('span', { class: 'etiquette neutre' }, 'libre actuellement');
+
+  return carte(
+    null,
+    el(
+      'div',
+      { class: 'recap-ligne' },
+      etiquetteAppareil(appareil),
+      situation,
+      enCours ? lienTelephone(enCours.rdv?.telephone) : null,
+      appareil.urgence ? el('span', { class: 'aide' }, '⚠ réservé aux urgences') : null,
+    ),
+    prochaines.length === 0
+      ? el('div', { class: 'recap-ligne aide' }, 'Aucune réservation à venir.')
+      : prochaines.map((p) => el(
+        'div',
+        { class: 'recap-ligne aide' },
+        `Réservé par ${nomPatient(p.rdv)} — pose le ${dateEnFrancais(decouper(p.debut).date)} `
+        + `à ${decouper(p.debut).heure}, dépose le ${dateEnFrancais(decouper(p.fin).date)} `
+        + `à ${decouper(p.fin).heure}`,
+      )),
   );
 }
 
@@ -123,6 +196,19 @@ function ficheRendezVous(rdv) {
       annule ? el('span', { class: 'etiquette urgence' }, 'ANNULÉ') : null,
       el('span', { class: 'espace' }),
       annule || posesActives.length === 0 ? null : el('button', {
+        class: 'bouton petit',
+        title: 'Imprimer la fiche remise au patient (numéro d’appareil, dates, rendez-vous)',
+        onclick: () => imprimerConvocation({
+          patientNom: nomPatient(rdv),
+          cardiologue: rdv.cardiologue,
+          rdvCardio: rdv.rdv_cardio,
+          lignes: posesActives
+            .map((pose) => ({ appareil: appareilParId(pose.appareil_id), debut: pose.debut, fin: pose.fin }))
+            .filter((l) => l.appareil),
+          nomCabinet: etat.reglages.cabinet?.nom,
+        }),
+      }, '🖨 Convocation'),
+      annule || posesActives.length === 0 ? null : el('button', {
         class: 'bouton petit principal',
         title: 'Changer la date, l’heure ou le matériel de ce rendez-vous',
         onclick: () => deplacer(rdv),
@@ -136,7 +222,7 @@ function ficheRendezVous(rdv) {
       'div',
       { class: 'recap-ligne' },
       el('span', {}, `Rendez-vous cardiologue : `, el('strong', {}, `${dateEnFrancaisLong(date)} à ${heure}`)),
-      rdv.telephone ? el('span', { class: 'aide' }, `☎ ${rdv.telephone}`) : null,
+      lienTelephone(rdv.telephone),
     ),
     posesActives.length === 0
       ? el('div', { class: 'recap-ligne aide' }, 'Aucun matériel attribué.')

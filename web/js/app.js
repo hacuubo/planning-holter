@@ -287,6 +287,14 @@ setInterval(() => {
   }
 }, 60000);
 
+// L'application devient installable (icône sur l'écran d'accueil) et reste
+// consultable si la connexion saute : voir sw.js.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((e) => {
+    console.warn('Service worker non enregistré :', e);
+  });
+}
+
 demarrer().catch((erreur) => {
   console.error(erreur);
   document.body.append(el(

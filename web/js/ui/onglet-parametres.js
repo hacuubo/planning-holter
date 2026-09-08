@@ -162,7 +162,7 @@ function ajouterAppareil() {
               const ordre = Math.max(0, ...etat.appareils.map((a) => a.ordre || 0)) + 1;
               await api.ajouterAppareil({ code, categorie, marque, urgence, ordre, actif: true });
               fermer();
-              await rafraichir();
+              await rafraichir(true);
               notifier('Appareil ajouté.', 'succes');
               redessiner();
             } catch (erreur) { notifierErreur(erreur); }
@@ -201,7 +201,7 @@ function gererAppareil(appareil) {
           onclick: async () => {
             try {
               await api.modifierAppareil(appareil.id, { hors_service: false });
-              fermer(); await rafraichir();
+              fermer(); await rafraichir(true);
               notifier(`${libelleAppareil(appareil)} est de nouveau en service.`, 'succes');
               redessiner();
             } catch (erreur) { notifierErreur(erreur); }
@@ -220,7 +220,7 @@ function gererAppareil(appareil) {
           onclick: async () => {
             try {
               await api.modifierAppareil(appareil.id, { actif: true, hors_service: false });
-              fermer(); await rafraichir(); notifier('Appareil remis en service.', 'succes'); redessiner();
+              fermer(); await rafraichir(true); notifier('Appareil remis en service.', 'succes'); redessiner();
             } catch (erreur) { notifierErreur(erreur); }
           },
         }, 'Remettre en service')
@@ -256,7 +256,7 @@ async function mettreHorsService(appareil) {
 
   try {
     await api.modifierAppareil(appareil.id, { hors_service: true });
-    await rafraichir();
+    await rafraichir(true);
     notifier(futures.length === 0
       ? 'Appareil mis hors service.'
       : `Appareil mis hors service : ${futures.length} patient(s) à réattribuer dans l’onglet Alertes.`,
@@ -282,7 +282,7 @@ async function supprimerAppareil(appareil) {
     if (!ok) return;
     try {
       await api.retirerAppareil(appareil.id);
-      await rafraichir();
+      await rafraichir(true);
       notifier('Appareil retiré du parc.', 'succes');
       redessiner();
     } catch (erreur) { notifierErreur(erreur); }
@@ -372,7 +372,7 @@ async function appliquerRemplacements(appareil, remplacements) {
       reussites++;
     } catch (erreur) {
       notifierErreur(erreur);
-      await rafraichir();
+      await rafraichir(true);
       notifier('Réattribution interrompue : rien n’a été retiré du parc.', 'erreur');
       redessiner();
       return;
@@ -380,7 +380,7 @@ async function appliquerRemplacements(appareil, remplacements) {
   }
   try {
     await api.retirerAppareil(appareil.id);
-    await rafraichir();
+    await rafraichir(true);
     notifier(`${reussites} patient(s) réattribué(s), appareil retiré du parc.`, 'succes');
     redessiner();
   } catch (erreur) { notifierErreur(erreur); }
@@ -528,7 +528,7 @@ function sectionHoraires(admin) {
             minutesAvantRdvCardio: minutesAvant,
             toleranceDureeMinutes: tolerance,
           });
-          await rafraichir();
+          await rafraichir(true);
           notifier('Horaires enregistrés.', 'succes');
           redessiner();
         } catch (erreur) { notifierErreur(erreur); }
@@ -582,7 +582,7 @@ function sectionCardiologues(admin) {
         onclick: async () => {
           try {
             await api.enregistrerParametre('cardiologues', liste);
-            await rafraichir();
+            await rafraichir(true);
             notifier('Liste enregistrée.', 'succes');
             redessiner();
           } catch (erreur) { notifierErreur(erreur); }
@@ -646,7 +646,7 @@ function sectionFermetures(admin) {
         onclick: async () => {
           try {
             await api.enregistrerParametre('planification', { ...planification, fermeturesExceptionnelles: fermetures });
-            await rafraichir();
+            await rafraichir(true);
             notifier('Fermetures enregistrées.', 'succes');
             redessiner();
           } catch (erreur) { notifierErreur(erreur); }
@@ -749,7 +749,7 @@ function sectionSauvegarde() {
           await api.enregistrerParametre('sauvegarde', {
             ...reglage, destinataires, frequence, joursConservation: conservation,
           });
-          await rafraichir();
+          await rafraichir(true);
           notifier('Réglages de sauvegarde enregistrés.', 'succes');
           redessiner();
         } catch (erreur) { notifierErreur(erreur); }

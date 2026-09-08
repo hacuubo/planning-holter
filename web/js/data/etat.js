@@ -114,11 +114,20 @@ export async function chargerTout() {
   }
 }
 
-/** Recharge uniquement les poses (après une modification distante). */
+/**
+ * Recharge uniquement les poses et les rappels : c'est ce qui change dans
+ * l'immense majorité des actions (réservation, pointage, déplacement…).
+ * Beaucoup plus léger que `chargerTout`, donc quasi instantané.
+ */
 export async function rechargerPoses() {
   const { debut, fin } = etat.fenetre;
   if (!debut) return chargerTout();
-  etat.poses = await api.chargerPoses(debut, fin);
+  const [poses, rappels] = await Promise.all([
+    api.chargerPoses(debut, fin),
+    api.listerRappels().catch(() => etat.rappels),
+  ]);
+  etat.poses = poses;
+  etat.rappels = rappels;
   prevenir();
   return etat.poses;
 }
@@ -128,13 +137,21 @@ export async function rechargerPoses() {
 // ---------------------------------------------------------------------------
 
 let minuterie = null;
+let tablesModifiees = new Set();
 
 export function demarrerTempsReel() {
   api.ecouterModifications(
-    () => {
+    (evenement) => {
+      // On note QUELLES tables ont bougé : la plupart du temps ce ne sont que
+      // les poses/rendez-vous/rappels, et un rechargement léger suffit.
+      tablesModifiees.add(evenement?.table || 'inconnu');
       clearTimeout(minuterie);
       minuterie = setTimeout(() => {
-        chargerTout().catch((e) => console.error('Rechargement impossible :', e));
+        const legeres = ['poses', 'rendez_vous', 'rappels'];
+        const complet = [...tablesModifiees].some((t) => !legeres.includes(t));
+        tablesModifiees = new Set();
+        (complet ? chargerTout() : rechargerPoses())
+          .catch((e) => console.error('Rechargement impossible :', e));
       }, 350);
     },
     (connecte) => {
@@ -151,9 +168,14 @@ export function arreterTempsReel() {
   api.arreterEcoute();
 }
 
-/** À appeler après toute écriture faite depuis ce poste. */
-export async function rafraichir() {
-  await chargerTout();
+/**
+ * À appeler après toute écriture faite depuis ce poste.
+ * Par défaut, rechargement LÉGER (poses + rappels) : quasi instantané.
+ * Passer `true` quand l'écriture touche le parc matériel ou les réglages.
+ */
+export async function rafraichir(complet = false) {
+  if (complet) await chargerTout();
+  else await rechargerPoses();
 }
 
 export { prevenir };
