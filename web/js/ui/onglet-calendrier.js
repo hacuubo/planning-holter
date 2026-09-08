@@ -303,6 +303,8 @@ function traitDePose(pose, jour, appareil) {
   }
 
   const patient = nomPatient(pose.rdv);
+  // Le numéro d'appareil précède le nom du patient sur le trait.
+  const etiquette = `${appareil.code} · ${patient}`;
   // En vue large les cases sont trop étroites pour les heures : elles ne
   // s'affichent qu'en vue rapprochée (3 jours) ; l'info-bulle les donne
   // toujours.
@@ -310,7 +312,7 @@ function traitDePose(pose, jour, appareil) {
   const contenu = [];
   if (jour === debut) {
     if (heuresVisibles) contenu.push(el('span', { class: 'trait-heure' }, p.heure));
-    contenu.push(el('span', { class: 'trait-nom' }, heuresVisibles ? patient : patient.slice(0, 9)));
+    contenu.push(el('span', { class: 'trait-nom' }, heuresVisibles ? etiquette : etiquette.slice(0, 12)));
   }
   if (jour === fin && heuresVisibles) {
     contenu.push(el('span', { class: 'trait-heure trait-heure-fin' }, d.heure));
