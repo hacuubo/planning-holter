@@ -139,6 +139,7 @@ toujours quelle version tourne au cabinet.
 | Version | Date | Contenu |
 |---------|------|---------|
 | 1.0.0 | mise en service initiale | planning, prise de rendez-vous, recherche, calendrier, réglages, statistiques, sauvegardes quotidiennes |
+| 1.6.1 | septembre 2026 | calendrier : les Holter DMS s'affichent avant les ELA, comme dans la légende |
 | 1.6.0 | septembre 2026 | Alertes : appareils non rendus à l'heure et poses sans pointage, régularisables en un clic ; « ⚡ Au plus tôt » à la prise de rendez-vous ; avertissement de double réservation ; convocation patient imprimable (couleur de la fiche, numéro d'appareil, dates) ; recherche par numéro d'appareil ; téléphones cliquables ; rechargements allégés après chaque action ; application installable (PWA) consultable hors connexion — aucune modification de la base |
 | 1.5.2 | septembre 2026 | calendrier : les traits reprennent la teinte pastel des cartes de la Journée (fond clair, texte et liseré dans la couleur soutenue) et affichent le numéro d'appareil avant le nom du patient |
 | 1.5.1 | septembre 2026 | couleurs calées sur les fiches papier du cabinet : jaune = Holter ELA, rose = Holter DMS, bleu = MAPA (le vert polygraphie et l'orange Spider Flash ne changent pas) |
