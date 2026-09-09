@@ -146,7 +146,15 @@ function redessiner() {
 
 function tableauCalendrier() {
   const params = parametres();
-  const appareils = appareilsActifs().filter((a) => !typesMasques.has(cleType(a)));
+  // Dans le calendrier, les Holter DMS s'affichent AVANT les ELA (comme dans
+  // la légende) ; les autres types gardent leur ordre habituel.
+  const rangCalendrier = (a) => {
+    if (a.categorie === 'holter_ecg') return a.marque === 'DMS' ? 0 : 1;
+    return 2;
+  };
+  const appareils = appareilsActifs()
+    .filter((a) => !typesMasques.has(cleType(a)))
+    .sort((a, b) => rangCalendrier(a) - rangCalendrier(b) || (a.ordre || 0) - (b.ordre || 0));
   if (appareils.length === 0) {
     return messageVide(typesMasques.size > 0
       ? 'Tous les types sont masqués : cliquez sur la légende pour les réafficher.'
